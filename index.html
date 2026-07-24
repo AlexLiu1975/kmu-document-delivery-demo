@@ -44,9 +44,18 @@
         <h2>公文文號索引</h2>
         <p>先輸入職號，再依個人習慣選擇圖形點選或手寫輸入文號。</p>
 
-        <label for="assignee">承辦人職號</label>
-        <input id="assignee" inputmode="numeric" maxlength="7" pattern="[0-9]{7}"
-          autocomplete="off" placeholder="例如：1115034">
+        <div id="assignee-login-panel">
+          <label for="assignee">承辦人職號</label>
+          <div class="assignee-login-row">
+            <input id="assignee" inputmode="numeric" maxlength="7" pattern="[0-9]{7}"
+              autocomplete="off" placeholder="例如：1115034">
+            <button id="assignee-login" class="button primary" type="button">登入</button>
+          </div>
+        </div>
+        <div id="assignee-session" class="assignee-session" hidden>
+          <span>目前職號：<strong id="current-assignee"></strong></span>
+          <button id="assignee-logout" class="button secondary" type="button">登出</button>
+        </div>
 
         <div class="input-mode-switch" aria-label="文號輸入方式">
           <button id="input-mode-graphic" class="input-mode active" type="button" aria-pressed="true">圖形點選</button>

@@ -80,6 +80,10 @@ test('registers received documents with a seven-digit employee number', () => {
   assert.throws(() => app.registerReceived(state, '115110501', '1115034'));
 });
 
+test('uses a one-minute employee session timeout', () => {
+  assert.equal(app.SESSION_TIMEOUT_MS, 60_000);
+});
+
 test('page is a dependency-free GitHub Pages demo', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.match(html, /公開測試版/);
@@ -88,6 +92,9 @@ test('page is a dependency-free GitHub Pages demo', () => {
   assert.match(html, /事務組/);
   assert.match(html, /重設測試資料/);
   assert.match(html, /id="assignee"/);
+  assert.match(html, /id="assignee-login"/);
+  assert.match(html, /id="assignee-logout"/);
+  assert.match(html, /id="current-assignee"/);
   assert.match(html, /輸入職號/);
   assert.match(html, /placeholder="例如：1115034"/);
   assert.match(html, /id="input-mode-graphic"/);

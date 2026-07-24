@@ -66,6 +66,13 @@ textarea { min-height: 92px; resize: vertical; }
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 20px 0;
   padding: 6px; border-radius: 12px; background: #edf4f6;
 }
+.assignee-login-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.assignee-session {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  margin-top: 15px; padding: 12px 14px; border: 1px solid #b9dbc6;
+  border-radius: 10px; color: #175f3b; background: #f2faf5;
+}
+.assignee-session[hidden] { display: none; }
 .input-mode {
   min-height: 46px; border: 0; border-radius: 9px; color: var(--muted);
   background: transparent; font-weight: 800; cursor: pointer;
@@ -131,4 +138,5 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .index-toolbar { grid-template-columns: 1fr; }
   .index-heading { align-items: flex-start; flex-direction: column; }
   #manual-receive-form { grid-template-columns: 1fr; }
+  .assignee-login-row { grid-template-columns: 1fr; }
 }

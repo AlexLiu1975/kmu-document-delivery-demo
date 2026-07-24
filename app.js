@@ -6,6 +6,7 @@
   'use strict';
 
   var STORAGE_KEY = 'kmu-document-delivery-demo-v1';
+  var SESSION_TIMEOUT_MS = 60000;
   var REASONS = ['缺少發文日期', '缺少已用印信章', '缺少監印章', '缺少校對章', '其它'];
   var STATUS = { DELIVERED: '已送達', RECEIVED: '已收文', REJECTED: '已退文', ARCHIVED: '已歸檔' };
 
@@ -176,6 +177,7 @@
 
   var api = {
     STORAGE_KEY: STORAGE_KEY,
+    SESSION_TIMEOUT_MS: SESSION_TIMEOUT_MS,
     REASONS: REASONS,
     STATUS: STATUS,
     emptyState: emptyState,
@@ -197,6 +199,8 @@
   var selectedRejectId = '';
   var inputMode = 'graphic';
   var indexType = 'draft';
+  var currentAssignee = '';
+  var sessionTimer = null;
   var byId = function (id) { return document.getElementById(id); };
 
   function el(tag, className, text) {
@@ -296,6 +300,37 @@
     byId('input-mode-manual').setAttribute('aria-pressed', String(!graphic));
   }
 
+  function renderAssigneeSession() {
+    var loggedIn = Boolean(currentAssignee);
+    byId('assignee-login-panel').hidden = loggedIn;
+    byId('assignee-session').hidden = !loggedIn;
+    byId('current-assignee').textContent = currentAssignee;
+  }
+
+  function logoutAssignee(isAutomatic) {
+    currentAssignee = '';
+    if (sessionTimer) window.clearTimeout(sessionTimer);
+    sessionTimer = null;
+    byId('assignee').value = '';
+    renderAssigneeSession();
+    if (isAutomatic) notify('閒置超過1分鐘，已自動登出。');
+  }
+
+  function resetSessionTimer() {
+    if (!currentAssignee) return;
+    if (sessionTimer) window.clearTimeout(sessionTimer);
+    sessionTimer = window.setTimeout(function () {
+      logoutAssignee(true);
+    }, SESSION_TIMEOUT_MS);
+  }
+
+  function loginAssignee() {
+    currentAssignee = normalizeAssignee(byId('assignee').value);
+    renderAssigneeSession();
+    resetSessionTimer();
+    notify('職號 ' + currentAssignee + ' 已登入。');
+  }
+
   function showReceivedResult(number) {
     var record = findDocument(number);
     clear(byId('deliver-result'));
@@ -303,8 +338,8 @@
   }
 
   function runRegisterReceived(number) {
-    var handler = byId('assignee').value;
-    state = registerReceived(state, number, handler);
+    if (!currentAssignee) throw new Error('請先輸入職號並登入。');
+    state = registerReceived(state, number, currentAssignee);
     saveState(state);
     showReceivedResult(number);
     renderAll();
@@ -389,6 +424,7 @@
     renderHistory();
     renderInputMode();
     renderMatrix();
+    renderAssigneeSession();
   }
 
   function activate(name) {
@@ -420,6 +456,26 @@
     } catch (error) {
       notify(error.message, true);
     }
+  });
+
+  byId('assignee-login').addEventListener('click', function () {
+    try {
+      loginAssignee();
+    } catch (error) {
+      notify(error.message, true);
+    }
+  });
+  byId('assignee').addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    byId('assignee-login').click();
+  });
+  byId('assignee-logout').addEventListener('click', function () {
+    logoutAssignee(false);
+    notify('已登出。');
+  });
+  ['click', 'keydown', 'pointerdown', 'touchstart'].forEach(function (eventName) {
+    document.addEventListener(eventName, resetSessionTimer, { passive: true });
   });
 
   byId('input-mode-graphic').addEventListener('click', function () {
