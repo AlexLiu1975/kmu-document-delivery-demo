@@ -55,6 +55,7 @@
     transitions[STATUS.REJECTED + '|REDELIVER'] = STATUS.DELIVERED;
     transitions[STATUS.DELIVERED + '|RECEIVE'] = STATUS.RECEIVED;
     transitions[STATUS.DELIVERED + '|REJECT'] = STATUS.REJECTED;
+    transitions[STATUS.RECEIVED + '|REJECT'] = STATUS.REJECTED;
     transitions[STATUS.RECEIVED + '|ARCHIVE'] = STATUS.ARCHIVED;
     var result = transitions[String(fromStatus || '') + '|' + action];
     if (!result) throw new Error('目前狀態不允許執行此操作。');
@@ -334,16 +335,16 @@
         actions.appendChild(actionButton('確認收件', 'primary', function () {
           runManage(record.id, 'RECEIVE');
         }));
-        actions.appendChild(actionButton('退文', 'danger', function () {
-          selectedRejectId = record.id;
-          byId('reject-doc').textContent = '文號：' + record.documentNumber;
-          byId('reject-dialog').showModal();
-        }));
       } else {
         actions.appendChild(actionButton('歸檔', 'primary', function () {
           runManage(record.id, 'ARCHIVE');
         }));
       }
+      actions.appendChild(actionButton('退文', 'danger', function () {
+        selectedRejectId = record.id;
+        byId('reject-doc').textContent = '文號：' + record.documentNumber;
+        byId('reject-dialog').showModal();
+      }));
       row.appendChild(actions);
       body.appendChild(row);
     });

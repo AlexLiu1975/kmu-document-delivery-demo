@@ -19,6 +19,7 @@ test('supports the approved workflow only', () => {
   assert.equal(app.nextStatus('已退文', 'REDELIVER'), '已送達');
   assert.equal(app.nextStatus('已送達', 'RECEIVE'), '已收文');
   assert.equal(app.nextStatus('已送達', 'REJECT'), '已退文');
+  assert.equal(app.nextStatus('已收文', 'REJECT'), '已退文');
   assert.equal(app.nextStatus('已收文', 'ARCHIVE'), '已歸檔');
   assert.throws(() => app.nextStatus('已歸檔', 'DELIVER'));
 });
@@ -28,6 +29,15 @@ test('validates the fixed rejection reasons', () => {
   assert.equal(app.validateRejectionReason('其它', '附件錯誤'), '其它：附件錯誤');
   assert.throws(() => app.validateRejectionReason('其它', ''));
   assert.throws(() => app.validateRejectionReason('未核准選項', ''));
+});
+
+test('allows staff to reject a received document with a fixed reason', () => {
+  let state = app.registerReceived(app.emptyState(), '1151100500', '1115034');
+  const id = state.documents[0].id;
+  state = app.manage(state, id, 'REJECT', '缺少發文日期', '', '事務組測試人員');
+  assert.equal(state.documents[0].status, '已退文');
+  assert.equal(state.documents[0].latestRejectionReason, '缺少發文日期');
+  assert.equal(state.history[1].action, '退文');
 });
 
 test('creates, rejects, redelivers, receives, and archives immutable history', () => {
@@ -84,6 +94,11 @@ test('page is a dependency-free GitHub Pages demo', () => {
   assert.match(html, /id="input-mode-manual"/);
   assert.match(html, /id="document-matrix"/);
   assert.match(html, /id="manual-receive-form"/);
+  assert.match(html, /<option>缺少發文日期<\/option>/);
+  assert.match(html, /<option>缺少已用印信章<\/option>/);
+  assert.match(html, /<option>缺少監印章<\/option>/);
+  assert.match(html, /<option>缺少校對章<\/option>/);
+  assert.match(html, /<option value="其它">其它：<\/option>/);
   assert.doesNotMatch(html, /google\.script\.run/);
   assert.doesNotMatch(html, /@kmu\.edu\.tw/);
   assert.doesNotMatch(html, /<script[^>]+src=["']https?:/i);
