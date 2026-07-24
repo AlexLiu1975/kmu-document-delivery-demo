@@ -56,16 +56,18 @@ test('builds ten-digit index document numbers', () => {
   assert.equal(app.buildDocumentNumber('115', '000', 599), '1150000599');
 });
 
-test('registers received documents with an assignee from either input method', () => {
+test('registers received documents with a seven-digit employee number', () => {
   let state = app.emptyState();
-  state = app.registerReceived(state, '1151100500', '王小明');
+  state = app.registerReceived(state, '1151100500', '1115034');
   assert.equal(state.documents[0].status, '已收文');
-  assert.equal(state.documents[0].assignee, '王小明');
+  assert.equal(state.documents[0].assignee, '1115034');
   assert.equal(state.history[0].action, '承辦人收文');
-  assert.equal(state.history[0].actor, '王小明');
-  assert.throws(() => app.registerReceived(state, '1151100500', '王小明'));
+  assert.equal(state.history[0].actor, '1115034');
+  assert.throws(() => app.registerReceived(state, '1151100500', '1115034'));
   assert.throws(() => app.registerReceived(state, '1151100501', ''));
-  assert.throws(() => app.registerReceived(state, '115110501', '王小明'));
+  assert.throws(() => app.registerReceived(state, '1151100501', '王小明'));
+  assert.throws(() => app.registerReceived(state, '1151100501', '123456'));
+  assert.throws(() => app.registerReceived(state, '115110501', '1115034'));
 });
 
 test('page is a dependency-free GitHub Pages demo', () => {
@@ -76,6 +78,8 @@ test('page is a dependency-free GitHub Pages demo', () => {
   assert.match(html, /事務組/);
   assert.match(html, /重設測試資料/);
   assert.match(html, /id="assignee"/);
+  assert.match(html, /輸入職號/);
+  assert.match(html, /placeholder="例如：1115034"/);
   assert.match(html, /id="input-mode-graphic"/);
   assert.match(html, /id="input-mode-manual"/);
   assert.match(html, /id="document-matrix"/);

@@ -42,10 +42,11 @@
       <div class="card receive-card">
         <span class="eyebrow">承辦人收文</span>
         <h2>公文文號索引</h2>
-        <p>先輸入承辦人，再依個人習慣選擇圖形點選或手寫輸入文號。</p>
+        <p>先輸入職號，再依個人習慣選擇圖形點選或手寫輸入文號。</p>
 
-        <label for="assignee">承辦人</label>
-        <input id="assignee" maxlength="50" autocomplete="name" placeholder="請輸入承辦人姓名">
+        <label for="assignee">承辦人職號</label>
+        <input id="assignee" inputmode="numeric" maxlength="7" pattern="[0-9]{7}"
+          autocomplete="off" placeholder="例如：1115034">
 
         <div class="input-mode-switch" aria-label="文號輸入方式">
           <button id="input-mode-graphic" class="input-mode active" type="button" aria-pressed="true">圖形點選</button>

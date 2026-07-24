@@ -45,8 +45,7 @@
 
   function normalizeAssignee(value) {
     var text = String(value == null ? '' : value).trim();
-    if (!text) throw new Error('請輸入承辦人。');
-    if (text.length > 50) throw new Error('承辦人不可超過 50 個字元。');
+    if (!/^\d{7}$/.test(text)) throw new Error('請輸入7碼職號，例如：1115034。');
     return text;
   }
 
@@ -226,7 +225,7 @@
       ['首次送達', record.firstDeliveredAt],
       ['最近送達', record.lastDeliveredAt],
       ['最後更新', record.updatedAt],
-      ['承辦人', record.assignee || '—'],
+      ['職號', record.assignee || '—'],
       ['最近退文原因', record.latestRejectionReason || '—']
     ].forEach(function (pair) {
       var row = el('div', 'record-row');
