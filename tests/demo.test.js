@@ -17,9 +17,9 @@ test('normalizes document numbers and rejects invalid lengths', () => {
 test('supports the approved workflow only', () => {
   assert.equal(app.nextStatus('', 'DELIVER'), '已送達');
   assert.equal(app.nextStatus('已退文', 'REDELIVER'), '已送達');
-  assert.equal(app.nextStatus('已送達', 'RECEIVE'), '已收件');
+  assert.equal(app.nextStatus('已送達', 'RECEIVE'), '已收文');
   assert.equal(app.nextStatus('已送達', 'REJECT'), '已退文');
-  assert.equal(app.nextStatus('已收件', 'ARCHIVE'), '已歸檔');
+  assert.equal(app.nextStatus('已收文', 'ARCHIVE'), '已歸檔');
   assert.throws(() => app.nextStatus('已歸檔', 'DELIVER'));
 });
 
@@ -51,6 +51,23 @@ test('prevents duplicate delivery unless the document was rejected', () => {
   assert.throws(() => app.deliver(state, '測試字第2號', '一般測試人員'));
 });
 
+test('builds ten-digit index document numbers', () => {
+  assert.equal(app.buildDocumentNumber('115', '110', 500), '1151100500');
+  assert.equal(app.buildDocumentNumber('115', '000', 599), '1150000599');
+});
+
+test('registers received documents with an assignee from either input method', () => {
+  let state = app.emptyState();
+  state = app.registerReceived(state, '1151100500', '王小明');
+  assert.equal(state.documents[0].status, '已收文');
+  assert.equal(state.documents[0].assignee, '王小明');
+  assert.equal(state.history[0].action, '承辦人收文');
+  assert.equal(state.history[0].actor, '王小明');
+  assert.throws(() => app.registerReceived(state, '1151100500', '王小明'));
+  assert.throws(() => app.registerReceived(state, '1151100501', ''));
+  assert.throws(() => app.registerReceived(state, '115110501', '王小明'));
+});
+
 test('page is a dependency-free GitHub Pages demo', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.match(html, /公開測試版/);
@@ -58,6 +75,11 @@ test('page is a dependency-free GitHub Pages demo', () => {
   assert.match(html, /一般人員/);
   assert.match(html, /事務組/);
   assert.match(html, /重設測試資料/);
+  assert.match(html, /id="assignee"/);
+  assert.match(html, /id="input-mode-graphic"/);
+  assert.match(html, /id="input-mode-manual"/);
+  assert.match(html, /id="document-matrix"/);
+  assert.match(html, /id="manual-receive-form"/);
   assert.doesNotMatch(html, /google\.script\.run/);
   assert.doesNotMatch(html, /@kmu\.edu\.tw/);
   assert.doesNotMatch(html, /<script[^>]+src=["']https?:/i);

@@ -7,7 +7,7 @@
 
   var STORAGE_KEY = 'kmu-document-delivery-demo-v1';
   var REASONS = ['缺少發文日期', '缺少已用印信章', '缺少監印章', '缺少校對章', '其它'];
-  var STATUS = { DELIVERED: '已送達', RECEIVED: '已收件', REJECTED: '已退文', ARCHIVED: '已歸檔' };
+  var STATUS = { DELIVERED: '已送達', RECEIVED: '已收文', REJECTED: '已退文', ARCHIVED: '已歸檔' };
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -29,6 +29,24 @@
     var text = String(value == null ? '' : value).trim().replace(/\s+/g, ' ').toUpperCase();
     if (!text) throw new Error('請輸入文號。');
     if (text.length > 100) throw new Error('文號不可超過 100 個字元。');
+    return text;
+  }
+
+  function buildDocumentNumber(year, typeCode, serial) {
+    return String(year).padStart(3, '0') + String(typeCode).padStart(3, '0') +
+      String(serial).padStart(4, '0');
+  }
+
+  function normalizeIndexDocumentNumber(value) {
+    var text = String(value == null ? '' : value).trim();
+    if (!/^\d{10}$/.test(text)) throw new Error('請輸入完整 10 碼文號。');
+    return text;
+  }
+
+  function normalizeAssignee(value) {
+    var text = String(value == null ? '' : value).trim();
+    if (!text) throw new Error('請輸入承辦人。');
+    if (text.length > 50) throw new Error('承辦人不可超過 50 個字元。');
     return text;
   }
 
@@ -94,6 +112,33 @@
     return state;
   }
 
+  function registerReceived(inputState, number, assignee) {
+    var state = clone(inputState);
+    var normalized = normalizeIndexDocumentNumber(number);
+    var handler = normalizeAssignee(assignee);
+    var document = state.documents.find(function (item) { return item.index === normalized; });
+    var time = nowText();
+    if (document && document.status !== STATUS.DELIVERED) {
+      throw new Error('此文號已登錄，目前狀態為「' + document.status + '」。');
+    }
+    if (!document) {
+      document = {
+        id: newId('DOC'), documentNumber: normalized, index: normalized,
+        status: STATUS.RECEIVED, firstDeliveredAt: time, lastDeliveredAt: time,
+        updatedAt: time, latestRejectionReason: '', assignee: handler
+      };
+      state.documents.push(document);
+      addHistory(state, document, '承辦人收文', '', handler);
+      return state;
+    }
+    var oldStatus = document.status;
+    document.status = STATUS.RECEIVED;
+    document.updatedAt = time;
+    document.assignee = handler;
+    addHistory(state, document, '承辦人收文', oldStatus, handler);
+    return state;
+  }
+
   function manage(inputState, documentId, action, category, detail, actor) {
     var state = clone(inputState);
     var document = state.documents.find(function (item) { return item.id === documentId; });
@@ -135,9 +180,12 @@
     STATUS: STATUS,
     emptyState: emptyState,
     normalizeDocumentNumber: normalizeDocumentNumber,
+    buildDocumentNumber: buildDocumentNumber,
+    normalizeIndexDocumentNumber: normalizeIndexDocumentNumber,
     nextStatus: nextStatus,
     validateRejectionReason: validateRejectionReason,
     deliver: deliver,
+    registerReceived: registerReceived,
     manage: manage,
     seedState: seedState
   };
@@ -147,6 +195,8 @@
   var state = loadState();
   var role = 'general';
   var selectedRejectId = '';
+  var inputMode = 'graphic';
+  var indexType = 'draft';
   var byId = function (id) { return document.getElementById(id); };
 
   function el(tag, className, text) {
@@ -176,6 +226,7 @@
       ['首次送達', record.firstDeliveredAt],
       ['最近送達', record.lastDeliveredAt],
       ['最後更新', record.updatedAt],
+      ['承辦人', record.assignee || '—'],
       ['最近退文原因', record.latestRejectionReason || '—']
     ].forEach(function (pair) {
       var row = el('div', 'record-row');
@@ -186,6 +237,78 @@
       card.appendChild(row);
     });
     return card;
+  }
+
+  function clampIndexPage(value) {
+    var parsed = parseInt(value, 10);
+    if (isNaN(parsed)) return 0;
+    return Math.max(0, Math.min(99, parsed));
+  }
+
+  function findDocument(number) {
+    return state.documents.find(function (item) { return item.index === number; });
+  }
+
+  function indexStatusClass(number) {
+    var record = findDocument(number);
+    if (!record) return 'index-pending';
+    if (record.status === STATUS.ARCHIVED) return 'index-archived';
+    if (record.status === STATUS.RECEIVED) return 'index-received';
+    return 'index-pending';
+  }
+
+  function renderMatrix() {
+    var body = byId('document-matrix');
+    if (!body) return;
+    clear(body);
+    var year = byId('index-year').value;
+    var page = clampIndexPage(byId('index-page').value);
+    var typeCode = indexType === 'draft' ? '110' : '000';
+    var start = page * 100;
+    var end = start + 99;
+    byId('index-page').value = page;
+    byId('index-prev').disabled = page === 0;
+    byId('index-next').disabled = page === 99;
+    byId('index-range').textContent =
+      buildDocumentNumber(year, typeCode, start) + '–' + buildDocumentNumber(year, typeCode, end);
+    byId('index-draft').classList.toggle('active', indexType === 'draft');
+    byId('index-draft').setAttribute('aria-pressed', String(indexType === 'draft'));
+    byId('index-receive').classList.toggle('active', indexType === 'receive');
+    byId('index-receive').setAttribute('aria-pressed', String(indexType === 'receive'));
+    for (var serial = start; serial <= end; serial += 1) {
+      var number = buildDocumentNumber(year, typeCode, serial);
+      var button = el('button', 'document-cell ' + indexStatusClass(number), number);
+      button.type = 'button';
+      button.dataset.documentNumber = number;
+      var record = findDocument(number);
+      button.title = record ? record.status + (record.assignee ? '｜' + record.assignee : '') : '未收文';
+      body.appendChild(button);
+    }
+  }
+
+  function renderInputMode() {
+    var graphic = inputMode === 'graphic';
+    byId('graphic-receive').hidden = !graphic;
+    byId('manual-receive').hidden = graphic;
+    byId('input-mode-graphic').classList.toggle('active', graphic);
+    byId('input-mode-graphic').setAttribute('aria-pressed', String(graphic));
+    byId('input-mode-manual').classList.toggle('active', !graphic);
+    byId('input-mode-manual').setAttribute('aria-pressed', String(!graphic));
+  }
+
+  function showReceivedResult(number) {
+    var record = findDocument(number);
+    clear(byId('deliver-result'));
+    byId('deliver-result').appendChild(recordCard(record));
+  }
+
+  function runRegisterReceived(number) {
+    var handler = byId('assignee').value;
+    state = registerReceived(state, number, handler);
+    saveState(state);
+    showReceivedResult(number);
+    renderAll();
+    notify('已登記為已收文。');
   }
 
   function renderManage() {
@@ -264,6 +387,8 @@
     if (role !== 'staff' && byId('panel-manage').classList.contains('active')) activate('deliver');
     renderManage();
     renderHistory();
+    renderInputMode();
+    renderMatrix();
   }
 
   function activate(name) {
@@ -286,20 +411,48 @@
     notify('已切換為' + byId('role-label').textContent + '。');
   });
 
-  byId('deliver-form').addEventListener('submit', function (event) {
+  byId('manual-receive-form').addEventListener('submit', function (event) {
     event.preventDefault();
     try {
-      state = deliver(state, byId('deliver-number').value,
-        role === 'staff' ? '事務組測試人員' : '一般測試人員');
-      saveState(state);
-      var record = state.documents.find(function (item) {
-        return item.index === normalizeDocumentNumber(byId('deliver-number').value);
-      });
-      clear(byId('deliver-result'));
-      byId('deliver-result').appendChild(recordCard(record));
-      event.currentTarget.reset();
-      renderAll();
-      notify('送達登錄完成。');
+      var number = byId('manual-document-number').value;
+      runRegisterReceived(number);
+      byId('manual-document-number').value = '';
+    } catch (error) {
+      notify(error.message, true);
+    }
+  });
+
+  byId('input-mode-graphic').addEventListener('click', function () {
+    inputMode = 'graphic';
+    renderInputMode();
+  });
+  byId('input-mode-manual').addEventListener('click', function () {
+    inputMode = 'manual';
+    renderInputMode();
+  });
+  byId('index-draft').addEventListener('click', function () {
+    indexType = 'draft';
+    renderMatrix();
+  });
+  byId('index-receive').addEventListener('click', function () {
+    indexType = 'receive';
+    renderMatrix();
+  });
+  byId('index-year').addEventListener('change', renderMatrix);
+  byId('index-page').addEventListener('change', renderMatrix);
+  byId('index-prev').addEventListener('click', function () {
+    byId('index-page').value = clampIndexPage(byId('index-page').value) - 1;
+    renderMatrix();
+  });
+  byId('index-next').addEventListener('click', function () {
+    byId('index-page').value = clampIndexPage(byId('index-page').value) + 1;
+    renderMatrix();
+  });
+  byId('document-matrix').addEventListener('click', function (event) {
+    var button = event.target.closest('[data-document-number]');
+    if (!button) return;
+    try {
+      runRegisterReceived(button.dataset.documentNumber);
     } catch (error) {
       notify(error.message, true);
     }

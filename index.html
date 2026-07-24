@@ -32,30 +32,78 @@
       <strong>安全提醒：</strong>請勿輸入真實公文文號或個人資料。本頁只用於操作流程測試。
     </section>
     <nav class="tabs" role="tablist" aria-label="主要功能">
-      <button class="tab active" role="tab" aria-selected="true" data-panel="deliver">送達登錄</button>
+      <button class="tab active" role="tab" aria-selected="true" data-panel="deliver">收文登記</button>
       <button class="tab" role="tab" aria-selected="false" data-panel="query">進度查詢</button>
       <button class="tab" id="tab-manage" role="tab" aria-selected="false" data-panel="manage" hidden>案件管理</button>
       <button class="tab" role="tab" aria-selected="false" data-panel="history">操作歷程</button>
     </nav>
 
     <section class="panel active" id="panel-deliver">
-      <div class="grid">
-        <form class="card" id="deliver-form">
-          <span class="eyebrow">一般人員功能</span>
-          <h2>登錄公文送達</h2>
-          <p>輸入測試文號，時間由瀏覽器自動記錄。</p>
-          <label for="deliver-number">公文文號</label>
-          <input id="deliver-number" maxlength="100" required placeholder="例如：測試秘字第115000003號">
-          <div class="actions">
-            <button class="button primary" type="submit">確認送達</button>
-            <button class="button secondary" type="reset">清除</button>
-          </div>
-        </form>
-        <div class="card">
-          <span class="eyebrow">最近結果</span>
-          <h2>登錄狀態</h2>
-          <div id="deliver-result" class="empty">尚未登錄新公文</div>
+      <div class="card receive-card">
+        <span class="eyebrow">承辦人收文</span>
+        <h2>公文文號索引</h2>
+        <p>先輸入承辦人，再依個人習慣選擇圖形點選或手寫輸入文號。</p>
+
+        <label for="assignee">承辦人</label>
+        <input id="assignee" maxlength="50" autocomplete="name" placeholder="請輸入承辦人姓名">
+
+        <div class="input-mode-switch" aria-label="文號輸入方式">
+          <button id="input-mode-graphic" class="input-mode active" type="button" aria-pressed="true">圖形點選</button>
+          <button id="input-mode-manual" class="input-mode" type="button" aria-pressed="false">手寫輸入文號</button>
         </div>
+
+        <section id="graphic-receive" class="receive-method">
+          <div class="index-toolbar">
+            <div>
+              <label for="index-year">年度</label>
+              <select id="index-year">
+                <option value="114">114</option>
+                <option value="115" selected>115</option>
+                <option value="116">116</option>
+              </select>
+            </div>
+            <div>
+              <span class="control-label">類別</span>
+              <div class="type-switch">
+                <button id="index-draft" class="type-button active" type="button" aria-pressed="true">創稿 110</button>
+                <button id="index-receive" class="type-button" type="button" aria-pressed="false">收文 000</button>
+              </div>
+            </div>
+            <div>
+              <span class="control-label">頁次</span>
+              <div class="index-pager">
+                <button id="index-prev" class="button secondary" type="button" aria-label="上一頁">←</button>
+                <input id="index-page" type="number" min="0" max="99" value="0" aria-label="頁碼">
+                <button id="index-next" class="button secondary" type="button" aria-label="下一頁">→</button>
+              </div>
+            </div>
+          </div>
+          <div class="index-heading">
+            <strong id="index-range">1151100000–1151100099</strong>
+            <span>點選文號後變紅色「已收文」</span>
+          </div>
+          <div class="document-matrix" id="document-matrix" aria-live="polite"></div>
+        </section>
+
+        <section id="manual-receive" class="receive-method" hidden>
+          <form id="manual-receive-form">
+            <label for="manual-document-number">完整10碼文號</label>
+            <input id="manual-document-number" inputmode="numeric" maxlength="10"
+              pattern="[0-9]{10}" placeholder="例如：1151100500" required>
+            <button class="button primary" type="submit">登記為已收文</button>
+          </form>
+        </section>
+
+        <div class="status-legend">
+          <span class="index-pending">● 未收文</span>
+          <span class="index-received">● 已收文</span>
+          <span class="index-archived">● 已歸檔</span>
+        </div>
+      </div>
+      <div class="card latest-result">
+        <span class="eyebrow">最近結果</span>
+        <h2>登記狀態</h2>
+        <div id="deliver-result" class="empty">尚未登記新公文</div>
       </div>
     </section>
 
