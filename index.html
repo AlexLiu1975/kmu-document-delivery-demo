@@ -53,7 +53,11 @@
           </div>
         </div>
         <div id="assignee-session" class="assignee-session" hidden>
-          <span>目前職號：<strong id="current-assignee"></strong></span>
+          <div class="login-state">
+            <strong class="login-success">✓ 已登入</strong>
+            <span>目前職號：<b id="current-assignee"></b></span>
+          </div>
+          <strong id="session-countdown" class="session-countdown">自動登出倒數 01:00</strong>
           <button id="assignee-logout" class="button secondary" type="button">登出</button>
         </div>
 

@@ -82,6 +82,9 @@ test('registers received documents with a seven-digit employee number', () => {
 
 test('uses a one-minute employee session timeout', () => {
   assert.equal(app.SESSION_TIMEOUT_MS, 60_000);
+  assert.equal(app.formatCountdown(60), '01:00');
+  assert.equal(app.formatCountdown(9), '00:09');
+  assert.equal(app.formatCountdown(0), '00:00');
 });
 
 test('page is a dependency-free GitHub Pages demo', () => {
@@ -95,6 +98,8 @@ test('page is a dependency-free GitHub Pages demo', () => {
   assert.match(html, /id="assignee-login"/);
   assert.match(html, /id="assignee-logout"/);
   assert.match(html, /id="current-assignee"/);
+  assert.match(html, /id="session-countdown"/);
+  assert.match(html, /✓ 已登入/);
   assert.match(html, /輸入職號/);
   assert.match(html, /placeholder="例如：1115034"/);
   assert.match(html, /id="input-mode-graphic"/);

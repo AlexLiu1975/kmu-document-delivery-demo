@@ -50,6 +50,13 @@
     return text;
   }
 
+  function formatCountdown(seconds) {
+    var total = Math.max(0, Math.floor(Number(seconds) || 0));
+    var minutes = Math.floor(total / 60);
+    var remainder = total % 60;
+    return String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0');
+  }
+
   function nextStatus(fromStatus, action) {
     var transitions = {};
     transitions['|DELIVER'] = STATUS.DELIVERED;
@@ -184,6 +191,7 @@
     normalizeDocumentNumber: normalizeDocumentNumber,
     buildDocumentNumber: buildDocumentNumber,
     normalizeIndexDocumentNumber: normalizeIndexDocumentNumber,
+    formatCountdown: formatCountdown,
     nextStatus: nextStatus,
     validateRejectionReason: validateRejectionReason,
     deliver: deliver,
@@ -201,6 +209,8 @@
   var indexType = 'draft';
   var currentAssignee = '';
   var sessionTimer = null;
+  var sessionInterval = null;
+  var sessionDeadline = 0;
   var byId = function (id) { return document.getElementById(id); };
 
   function el(tag, className, text) {
@@ -307,10 +317,19 @@
     byId('current-assignee').textContent = currentAssignee;
   }
 
+  function updateSessionCountdown() {
+    if (!currentAssignee) return;
+    var seconds = Math.max(0, Math.ceil((sessionDeadline - Date.now()) / 1000));
+    byId('session-countdown').textContent = '自動登出倒數 ' + formatCountdown(seconds);
+  }
+
   function logoutAssignee(isAutomatic) {
     currentAssignee = '';
     if (sessionTimer) window.clearTimeout(sessionTimer);
+    if (sessionInterval) window.clearInterval(sessionInterval);
     sessionTimer = null;
+    sessionInterval = null;
+    sessionDeadline = 0;
     byId('assignee').value = '';
     renderAssigneeSession();
     if (isAutomatic) notify('閒置超過1分鐘，已自動登出。');
@@ -319,9 +338,14 @@
   function resetSessionTimer() {
     if (!currentAssignee) return;
     if (sessionTimer) window.clearTimeout(sessionTimer);
+    sessionDeadline = Date.now() + SESSION_TIMEOUT_MS;
     sessionTimer = window.setTimeout(function () {
       logoutAssignee(true);
     }, SESSION_TIMEOUT_MS);
+    if (!sessionInterval) {
+      sessionInterval = window.setInterval(updateSessionCountdown, 1000);
+    }
+    updateSessionCountdown();
   }
 
   function loginAssignee() {
