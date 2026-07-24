@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="校內公文送達與查詢流程公開測試版">
+  <title>校內公文送達／查詢系統｜公開測試版</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="demo-banner">
+    公開測試版｜不連接正式系統，資料僅儲存在目前瀏覽器 localStorage
+  </div>
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="mark">DEMO</div>
+        <div>
+          <h1>校內公文送達／查詢系統</h1>
+          <p>公文狀態清楚可查，操作歷程完整保留</p>
+        </div>
+      </div>
+      <div class="role-box">
+        <span>目前身分</span>
+        <strong id="role-label">一般測試人員</strong>
+        <button id="role-toggle" class="link-button" type="button">切換一般人員／事務組</button>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section class="info">
+      <strong>安全提醒：</strong>請勿輸入真實公文文號或個人資料。本頁只用於操作流程測試。
+    </section>
+    <nav class="tabs" role="tablist" aria-label="主要功能">
+      <button class="tab active" role="tab" aria-selected="true" data-panel="deliver">送達登錄</button>
+      <button class="tab" role="tab" aria-selected="false" data-panel="query">進度查詢</button>
+      <button class="tab" id="tab-manage" role="tab" aria-selected="false" data-panel="manage" hidden>案件管理</button>
+      <button class="tab" role="tab" aria-selected="false" data-panel="history">操作歷程</button>
+    </nav>
+
+    <section class="panel active" id="panel-deliver">
+      <div class="grid">
+        <form class="card" id="deliver-form">
+          <span class="eyebrow">一般人員功能</span>
+          <h2>登錄公文送達</h2>
+          <p>輸入測試文號，時間由瀏覽器自動記錄。</p>
+          <label for="deliver-number">公文文號</label>
+          <input id="deliver-number" maxlength="100" required placeholder="例如：測試秘字第115000003號">
+          <div class="actions">
+            <button class="button primary" type="submit">確認送達</button>
+            <button class="button secondary" type="reset">清除</button>
+          </div>
+        </form>
+        <div class="card">
+          <span class="eyebrow">最近結果</span>
+          <h2>登錄狀態</h2>
+          <div id="deliver-result" class="empty">尚未登錄新公文</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-query">
+      <div class="grid">
+        <form class="card" id="query-form">
+          <span class="eyebrow">一般人員功能</span>
+          <h2>查詢公文進度</h2>
+          <p>請輸入完整測試文號。</p>
+          <label for="query-number">公文文號</label>
+          <input id="query-number" maxlength="100" required placeholder="可查：測試秘字第115000001號">
+          <button class="button primary" type="submit">查詢進度</button>
+        </form>
+        <div class="card">
+          <span class="eyebrow">查詢結果</span>
+          <h2>目前狀態</h2>
+          <div id="query-result" class="empty">尚未查詢</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-manage">
+      <div class="card">
+        <span class="eyebrow">事務組功能</span>
+        <h2>待處理案件</h2>
+        <p>可確認收件、退文或將已收件案件歸檔。</p>
+        <div id="manage-list" class="case-list"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-history">
+      <div class="card">
+        <div class="heading-row">
+          <div>
+            <span class="eyebrow">測試資料</span>
+            <h2>操作歷程</h2>
+          </div>
+          <button id="reset-data" class="button secondary" type="button">重設測試資料</button>
+        </div>
+        <div id="history-list" class="history-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="reject-dialog">
+    <form id="reject-form" class="dialog-body">
+      <h2>退回公文</h2>
+      <p id="reject-doc"></p>
+      <label for="reason">退文原因</label>
+      <select id="reason" required>
+        <option value="">請選擇</option>
+        <option>缺少發文日期</option>
+        <option>缺少已用印信章</option>
+        <option>缺少監印章</option>
+        <option>缺少校對章</option>
+        <option>其它</option>
+      </select>
+      <div id="other-wrap" hidden>
+        <label for="other">其它原因</label>
+        <textarea id="other" maxlength="200"></textarea>
+      </div>
+      <div class="actions">
+        <button class="button danger" type="submit">確認退文</button>
+        <button class="button secondary" id="cancel-reject" type="button">取消</button>
+      </div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

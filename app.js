@@ -1,0 +1,356 @@
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.DocumentDemo = api;
+})(typeof window !== 'undefined' ? window : null, function () {
+  'use strict';
+
+  var STORAGE_KEY = 'kmu-document-delivery-demo-v1';
+  var REASONS = ['缺少發文日期', '缺少已用印信章', '缺少監印章', '缺少校對章', '其它'];
+  var STATUS = { DELIVERED: '已送達', RECEIVED: '已收件', REJECTED: '已退文', ARCHIVED: '已歸檔' };
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function nowText() {
+    return new Intl.DateTimeFormat('zh-TW', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }).format(new Date()).replace(/\//g, '-');
+  }
+
+  function newId(prefix) {
+    return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function normalizeDocumentNumber(value) {
+    var text = String(value == null ? '' : value).trim().replace(/\s+/g, ' ').toUpperCase();
+    if (!text) throw new Error('請輸入文號。');
+    if (text.length > 100) throw new Error('文號不可超過 100 個字元。');
+    return text;
+  }
+
+  function nextStatus(fromStatus, action) {
+    var transitions = {};
+    transitions['|DELIVER'] = STATUS.DELIVERED;
+    transitions[STATUS.REJECTED + '|REDELIVER'] = STATUS.DELIVERED;
+    transitions[STATUS.DELIVERED + '|RECEIVE'] = STATUS.RECEIVED;
+    transitions[STATUS.DELIVERED + '|REJECT'] = STATUS.REJECTED;
+    transitions[STATUS.RECEIVED + '|ARCHIVE'] = STATUS.ARCHIVED;
+    var result = transitions[String(fromStatus || '') + '|' + action];
+    if (!result) throw new Error('目前狀態不允許執行此操作。');
+    return result;
+  }
+
+  function validateRejectionReason(category, detail) {
+    var selected = String(category || '').trim();
+    var extra = String(detail || '').trim();
+    if (REASONS.indexOf(selected) < 0) throw new Error('請選擇有效的退文原因。');
+    if (selected === '其它') {
+      if (!extra) throw new Error('請填寫其它退文原因。');
+      if (extra.length > 200) throw new Error('其它原因不可超過 200 個字元。');
+      return '其它：' + extra;
+    }
+    return selected;
+  }
+
+  function emptyState() {
+    return { version: 1, documents: [], history: [] };
+  }
+
+  function addHistory(state, document, action, oldStatus, actor, reason) {
+    state.history.push({
+      id: newId('HIS'), documentId: document.id, documentNumber: document.documentNumber,
+      action: action, oldStatus: oldStatus || '', newStatus: document.status,
+      occurredAt: document.updatedAt, actor: actor, reason: reason || ''
+    });
+  }
+
+  function deliver(inputState, number, actor) {
+    var state = clone(inputState);
+    var normalized = normalizeDocumentNumber(number);
+    var document = state.documents.find(function (item) { return item.index === normalized; });
+    var time = nowText();
+    if (!document) {
+      document = {
+        id: newId('DOC'), documentNumber: normalized, index: normalized,
+        status: nextStatus('', 'DELIVER'), firstDeliveredAt: time,
+        lastDeliveredAt: time, updatedAt: time, latestRejectionReason: ''
+      };
+      state.documents.push(document);
+      addHistory(state, document, '首次送達', '', actor);
+      return state;
+    }
+    if (document.status !== STATUS.REJECTED) {
+      throw new Error('此文號已登錄，目前狀態為「' + document.status + '」。');
+    }
+    var oldStatus = document.status;
+    document.status = nextStatus(oldStatus, 'REDELIVER');
+    document.lastDeliveredAt = time;
+    document.updatedAt = time;
+    addHistory(state, document, '重新送達', oldStatus, actor);
+    return state;
+  }
+
+  function manage(inputState, documentId, action, category, detail, actor) {
+    var state = clone(inputState);
+    var document = state.documents.find(function (item) { return item.id === documentId; });
+    if (!document) throw new Error('查無此案件。');
+    var oldStatus = document.status;
+    var reason = action === 'REJECT' ? validateRejectionReason(category, detail) : '';
+    document.status = nextStatus(oldStatus, action);
+    document.updatedAt = nowText();
+    if (reason) document.latestRejectionReason = reason;
+    var labels = { RECEIVE: '確認收件', REJECT: '退文', ARCHIVE: '歸檔' };
+    addHistory(state, document, labels[action], oldStatus, actor, reason);
+    return state;
+  }
+
+  function seedState() {
+    var state = emptyState();
+    state = deliver(state, '測試秘字第115000001號', '一般測試人員');
+    state = deliver(state, '測試秘字第115000002號', '一般測試人員');
+    state = manage(state, state.documents[1].id, 'REJECT', '缺少校對章', '', '事務組測試人員');
+    return state;
+  }
+
+  function loadState() {
+    try {
+      var saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : seedState();
+    } catch (error) {
+      return seedState();
+    }
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  var api = {
+    STORAGE_KEY: STORAGE_KEY,
+    REASONS: REASONS,
+    STATUS: STATUS,
+    emptyState: emptyState,
+    normalizeDocumentNumber: normalizeDocumentNumber,
+    nextStatus: nextStatus,
+    validateRejectionReason: validateRejectionReason,
+    deliver: deliver,
+    manage: manage,
+    seedState: seedState
+  };
+
+  if (typeof document === 'undefined') return api;
+
+  var state = loadState();
+  var role = 'general';
+  var selectedRejectId = '';
+  var byId = function (id) { return document.getElementById(id); };
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function clear(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+  }
+
+  function notify(message, error) {
+    var box = byId('toast');
+    box.textContent = message;
+    box.classList.toggle('error', Boolean(error));
+    box.classList.add('show');
+    window.setTimeout(function () { box.classList.remove('show'); }, 3600);
+  }
+
+  function recordCard(record) {
+    var card = el('div', 'record');
+    [
+      ['文號', record.documentNumber],
+      ['目前狀態', record.status],
+      ['首次送達', record.firstDeliveredAt],
+      ['最近送達', record.lastDeliveredAt],
+      ['最後更新', record.updatedAt],
+      ['最近退文原因', record.latestRejectionReason || '—']
+    ].forEach(function (pair) {
+      var row = el('div', 'record-row');
+      row.appendChild(el('span', 'record-label', pair[0]));
+      var value = el('strong', pair[0] === '目前狀態' ? 'badge' : '', pair[1]);
+      if (pair[0] === '目前狀態') value.dataset.status = pair[1];
+      row.appendChild(value);
+      card.appendChild(row);
+    });
+    return card;
+  }
+
+  function renderManage() {
+    var body = byId('manage-list');
+    clear(body);
+    var records = state.documents.filter(function (item) {
+      return item.status === STATUS.DELIVERED || item.status === STATUS.RECEIVED;
+    });
+    if (!records.length) {
+      body.appendChild(el('p', 'empty', '目前沒有待處理案件。'));
+      return;
+    }
+    records.forEach(function (record) {
+      var row = el('article', 'case-row');
+      var info = el('div');
+      info.appendChild(el('strong', '', record.documentNumber));
+      var badge = el('span', 'badge', record.status);
+      badge.dataset.status = record.status;
+      info.appendChild(badge);
+      info.appendChild(el('small', '', '最後更新：' + record.updatedAt));
+      row.appendChild(info);
+      var actions = el('div', 'row-actions');
+      if (record.status === STATUS.DELIVERED) {
+        actions.appendChild(actionButton('確認收件', 'primary', function () {
+          runManage(record.id, 'RECEIVE');
+        }));
+        actions.appendChild(actionButton('退文', 'danger', function () {
+          selectedRejectId = record.id;
+          byId('reject-doc').textContent = '文號：' + record.documentNumber;
+          byId('reject-dialog').showModal();
+        }));
+      } else {
+        actions.appendChild(actionButton('歸檔', 'primary', function () {
+          runManage(record.id, 'ARCHIVE');
+        }));
+      }
+      row.appendChild(actions);
+      body.appendChild(row);
+    });
+  }
+
+  function actionButton(text, className, callback) {
+    var button = el('button', 'button ' + className, text);
+    button.type = 'button';
+    button.addEventListener('click', callback);
+    return button;
+  }
+
+  function runManage(id, action) {
+    try {
+      state = manage(state, id, action, '', '', '事務組測試人員');
+      saveState(state);
+      renderAll();
+      notify(action === 'RECEIVE' ? '收件完成。' : '歸檔完成。');
+    } catch (error) {
+      notify(error.message, true);
+    }
+  }
+
+  function renderHistory() {
+    var body = byId('history-list');
+    clear(body);
+    state.history.slice().reverse().forEach(function (event) {
+      var item = el('div', 'history-item');
+      item.appendChild(el('strong', '', event.action + ' · ' + event.documentNumber));
+      item.appendChild(el('span', '', (event.oldStatus || '新案件') + ' → ' + event.newStatus));
+      item.appendChild(el('small', '', event.occurredAt + ' · ' + event.actor +
+        (event.reason ? ' · ' + event.reason : '')));
+      body.appendChild(item);
+    });
+  }
+
+  function renderAll() {
+    byId('role-label').textContent = role === 'staff' ? '事務組測試人員' : '一般測試人員';
+    byId('tab-manage').hidden = role !== 'staff';
+    if (role !== 'staff' && byId('panel-manage').classList.contains('active')) activate('deliver');
+    renderManage();
+    renderHistory();
+  }
+
+  function activate(name) {
+    document.querySelectorAll('.tab').forEach(function (tab) {
+      tab.classList.toggle('active', tab.dataset.panel === name);
+      tab.setAttribute('aria-selected', String(tab.dataset.panel === name));
+    });
+    document.querySelectorAll('.panel').forEach(function (panel) {
+      panel.classList.toggle('active', panel.id === 'panel-' + name);
+    });
+  }
+
+  document.querySelectorAll('.tab').forEach(function (tab) {
+    tab.addEventListener('click', function () { activate(tab.dataset.panel); });
+  });
+
+  byId('role-toggle').addEventListener('click', function () {
+    role = role === 'general' ? 'staff' : 'general';
+    renderAll();
+    notify('已切換為' + byId('role-label').textContent + '。');
+  });
+
+  byId('deliver-form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    try {
+      state = deliver(state, byId('deliver-number').value,
+        role === 'staff' ? '事務組測試人員' : '一般測試人員');
+      saveState(state);
+      var record = state.documents.find(function (item) {
+        return item.index === normalizeDocumentNumber(byId('deliver-number').value);
+      });
+      clear(byId('deliver-result'));
+      byId('deliver-result').appendChild(recordCard(record));
+      event.currentTarget.reset();
+      renderAll();
+      notify('送達登錄完成。');
+    } catch (error) {
+      notify(error.message, true);
+    }
+  });
+
+  byId('query-form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var result = byId('query-result');
+    clear(result);
+    try {
+      var index = normalizeDocumentNumber(byId('query-number').value);
+      var record = state.documents.find(function (item) { return item.index === index; });
+      result.appendChild(record ? recordCard(record) : el('p', 'empty', '查無此文號資料。'));
+    } catch (error) {
+      notify(error.message, true);
+    }
+  });
+
+  byId('reason').addEventListener('change', function () {
+    var other = byId('other-wrap');
+    other.hidden = byId('reason').value !== '其它';
+    byId('other').required = !other.hidden;
+  });
+
+  byId('reject-form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    try {
+      state = manage(state, selectedRejectId, 'REJECT', byId('reason').value,
+        byId('other').value, '事務組測試人員');
+      saveState(state);
+      byId('reject-dialog').close();
+      event.currentTarget.reset();
+      byId('other-wrap').hidden = true;
+      renderAll();
+      notify('退文完成。');
+    } catch (error) {
+      notify(error.message, true);
+    }
+  });
+
+  byId('cancel-reject').addEventListener('click', function () { byId('reject-dialog').close(); });
+  byId('reset-data').addEventListener('click', function () {
+    if (!window.confirm('確定重設目前瀏覽器中的所有測試資料？')) return;
+    state = seedState();
+    saveState(state);
+    clear(byId('deliver-result'));
+    clear(byId('query-result'));
+    renderAll();
+    notify('測試資料已重設。');
+  });
+
+  renderAll();
+  return api;
+});
