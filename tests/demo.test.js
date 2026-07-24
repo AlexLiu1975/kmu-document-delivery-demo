@@ -80,6 +80,20 @@ test('registers received documents with a seven-digit employee number', () => {
   assert.throws(() => app.registerReceived(state, '115110501', '1115034'));
 });
 
+test('allows a rejected document to be received again', () => {
+  let state = app.registerReceived(app.emptyState(), '1151100016', '1115034');
+  const id = state.documents[0].id;
+  state = app.manage(state, id, 'REJECT', '缺少發文日期', '', '事務組測試人員');
+  state = app.registerReceived(state, '1151100016', '1115034');
+
+  assert.equal(state.documents[0].status, '已收文');
+  assert.equal(state.documents[0].assignee, '1115034');
+  assert.deepEqual(
+    state.history.map((event) => event.action),
+    ['承辦人收文', '退文', '承辦人重新收文']
+  );
+});
+
 test('uses a one-minute employee session timeout', () => {
   assert.equal(app.SESSION_TIMEOUT_MS, 60_000);
   assert.equal(app.formatCountdown(60), '01:00');

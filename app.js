@@ -70,6 +70,7 @@
     transitions['|DELIVER'] = STATUS.DELIVERED;
     transitions[STATUS.REJECTED + '|REDELIVER'] = STATUS.DELIVERED;
     transitions[STATUS.DELIVERED + '|RECEIVE'] = STATUS.RECEIVED;
+    transitions[STATUS.REJECTED + '|RECEIVE'] = STATUS.RECEIVED;
     transitions[STATUS.DELIVERED + '|REJECT'] = STATUS.REJECTED;
     transitions[STATUS.RECEIVED + '|REJECT'] = STATUS.REJECTED;
     transitions[STATUS.RECEIVED + '|ARCHIVE'] = STATUS.ARCHIVED;
@@ -134,7 +135,7 @@
     var handler = normalizeAssignee(assignee);
     var document = state.documents.find(function (item) { return item.index === normalized; });
     var time = nowText();
-    if (document && document.status !== STATUS.DELIVERED) {
+    if (document && document.status !== STATUS.DELIVERED && document.status !== STATUS.REJECTED) {
       throw new Error('此文號已登錄，目前狀態為「' + document.status + '」。');
     }
     if (!document) {
@@ -148,10 +149,16 @@
       return state;
     }
     var oldStatus = document.status;
-    document.status = STATUS.RECEIVED;
+    document.status = nextStatus(oldStatus, 'RECEIVE');
     document.updatedAt = time;
     document.assignee = handler;
-    addHistory(state, document, '承辦人收文', oldStatus, handler);
+    addHistory(
+      state,
+      document,
+      oldStatus === STATUS.REJECTED ? '承辦人重新收文' : '承辦人收文',
+      oldStatus,
+      handler
+    );
     return state;
   }
 
