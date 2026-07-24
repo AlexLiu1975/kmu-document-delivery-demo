@@ -87,6 +87,14 @@ test('uses a one-minute employee session timeout', () => {
   assert.equal(app.formatCountdown(0), '00:00');
 });
 
+test('does not carry a logged-in employee session into staff access', () => {
+  assert.equal(app.canSwitchRole(''), true);
+  assert.equal(app.canSwitchRole('1115034'), false);
+  assert.equal(app.canAccessStaff('general', '1115034'), false);
+  assert.equal(app.canAccessStaff('staff', ''), false);
+  assert.equal(app.canAccessStaff('staff', '1115034'), true);
+});
+
 test('page is a dependency-free GitHub Pages demo', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.match(html, /公開測試版/);

@@ -57,6 +57,14 @@
     return String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0');
   }
 
+  function canSwitchRole(employeeNumber) {
+    return !String(employeeNumber || '').trim();
+  }
+
+  function canAccessStaff(roleName, employeeNumber) {
+    return roleName === 'staff' && /^\d{7}$/.test(String(employeeNumber || '').trim());
+  }
+
   function nextStatus(fromStatus, action) {
     var transitions = {};
     transitions['|DELIVER'] = STATUS.DELIVERED;
@@ -192,6 +200,8 @@
     buildDocumentNumber: buildDocumentNumber,
     normalizeIndexDocumentNumber: normalizeIndexDocumentNumber,
     formatCountdown: formatCountdown,
+    canSwitchRole: canSwitchRole,
+    canAccessStaff: canAccessStaff,
     nextStatus: nextStatus,
     validateRejectionReason: validateRejectionReason,
     deliver: deliver,
@@ -331,7 +341,7 @@
     sessionInterval = null;
     sessionDeadline = 0;
     byId('assignee').value = '';
-    renderAssigneeSession();
+    renderAll();
     if (isAutomatic) notify('閒置超過1分鐘，已自動登出。');
   }
 
@@ -350,8 +360,8 @@
 
   function loginAssignee() {
     currentAssignee = normalizeAssignee(byId('assignee').value);
-    renderAssigneeSession();
     resetSessionTimer();
+    renderAll();
     notify('職號 ' + currentAssignee + ' 已登入。');
   }
 
@@ -373,6 +383,7 @@
   function renderManage() {
     var body = byId('manage-list');
     clear(body);
+    if (!canAccessStaff(role, currentAssignee)) return;
     var records = state.documents.filter(function (item) {
       return item.status === STATUS.DELIVERED || item.status === STATUS.RECEIVED;
     });
@@ -418,6 +429,9 @@
 
   function runManage(id, action) {
     try {
+      if (!canAccessStaff(role, currentAssignee)) {
+        throw new Error('請先以事務組身分登入。');
+      }
       state = manage(state, id, action, '', '', '事務組測試人員');
       saveState(state);
       renderAll();
@@ -441,9 +455,12 @@
   }
 
   function renderAll() {
+    var staffAccess = canAccessStaff(role, currentAssignee);
     byId('role-label').textContent = role === 'staff' ? '事務組測試人員' : '一般測試人員';
-    byId('tab-manage').hidden = role !== 'staff';
-    if (role !== 'staff' && byId('panel-manage').classList.contains('active')) activate('deliver');
+    byId('role-toggle').disabled = !canSwitchRole(currentAssignee);
+    byId('role-toggle').title = currentAssignee ? '請先登出目前職號' : '';
+    byId('tab-manage').hidden = !staffAccess;
+    if (!staffAccess && byId('panel-manage').classList.contains('active')) activate('deliver');
     renderManage();
     renderHistory();
     renderInputMode();
@@ -466,6 +483,10 @@
   });
 
   byId('role-toggle').addEventListener('click', function () {
+    if (!canSwitchRole(currentAssignee)) {
+      notify('請先登出目前職號，再切換身分。', true);
+      return;
+    }
     role = role === 'general' ? 'staff' : 'general';
     renderAll();
     notify('已切換為' + byId('role-label').textContent + '。');
@@ -560,6 +581,9 @@
   byId('reject-form').addEventListener('submit', function (event) {
     event.preventDefault();
     try {
+      if (!canAccessStaff(role, currentAssignee)) {
+        throw new Error('請先以事務組身分登入。');
+      }
       state = manage(state, selectedRejectId, 'REJECT', byId('reason').value,
         byId('other').value, '事務組測試人員');
       saveState(state);

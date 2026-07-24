@@ -27,6 +27,7 @@ h1 { margin: 0; font-size: clamp(1.2rem, 3vw, 1.7rem); }
 .role-box span, .role-box strong { display: block; }
 .role-box span { color: #c8dfe8; font-size: .78rem; }
 .link-button { padding: 2px 0; border: 0; color: #9ee4de; background: none; text-decoration: underline; cursor: pointer; }
+.link-button:disabled { color: #91a5ae; cursor: not-allowed; text-decoration: none; }
 main { padding: 24px 0 48px; }
 .info { margin-bottom: 17px; padding: 12px 15px; border: 1px solid #cfdee4; border-radius: 12px; background: #ffffffb8; color: #405963; }
 .tabs { display: flex; gap: 6px; padding: 6px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: #ffffffbd; }
