@@ -122,6 +122,16 @@ test('shows the five history fields and rejection employee number', () => {
   assert.match(source, /最近退文人員職號/);
 });
 
+test('places logout and countdown in the global header', () => {
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const header = html.match(/<header>[\s\S]*?<\/header>/)[0];
+  const deliverPanel = html.match(/id="panel-deliver"[\s\S]*?id="panel-query"/)[0];
+  assert.match(header, /id="assignee-session"/);
+  assert.match(header, /id="session-countdown"/);
+  assert.match(header, /id="assignee-logout"/);
+  assert.doesNotMatch(deliverPanel, /id="assignee-session"/);
+});
+
 test('page is a dependency-free GitHub Pages demo', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.match(html, /公開測試版/);

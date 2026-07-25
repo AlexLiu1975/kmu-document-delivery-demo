@@ -77,19 +77,21 @@ textarea { min-height: 92px; resize: vertical; }
 }
 .assignee-login-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
 .assignee-session {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  margin-top: 15px; padding: 16px 18px; border: 2px solid #56a476;
-  border-radius: 12px; color: #175f3b; background: #e8f7ed;
-  box-shadow: 0 7px 20px rgba(23,95,59,.12);
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  margin-top: 10px; padding: 9px 10px; border: 1px solid #86c5a0;
+  border-radius: 10px; color: #e8fff0; background: #0c4939;
+  box-shadow: 0 7px 20px rgba(0,0,0,.14);
 }
 .assignee-session[hidden] { display: none; }
-.login-state { display: grid; gap: 3px; }
-.login-success { font-size: 1.12rem; }
+.login-state { display: grid; gap: 1px; text-align: left; }
+.role-box .login-state span { color: #d5f5e0; font-size: .78rem; }
+.login-success { font-size: .9rem; }
 .session-countdown {
-  min-width: 185px; padding: 9px 12px; border-radius: 9px;
-  color: #fff; background: #175f3b; text-align: center;
+  min-width: 168px; padding: 7px 9px; border-radius: 8px;
+  color: #fff; background: #17634d; text-align: center; font-size: .82rem;
   font-variant-numeric: tabular-nums;
 }
+.header-logout { min-height: 38px; padding: 6px 12px; color: #123b5d; background: white; }
 .input-mode {
   min-height: 46px; border: 0; border-radius: 9px; color: var(--muted);
   background: transparent; font-weight: 800; cursor: pointer;
@@ -146,7 +148,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (max-width: 720px) {
   .header-inner { align-items: flex-start; padding: 18px 0; }
   .brand p { display: none; }
-  .role-box { max-width: 45%; font-size: .8rem; }
+  .role-box { max-width: 58%; font-size: .8rem; }
   .grid { grid-template-columns: 1fr; }
   .card { padding: 20px; }
   .case-row, .heading-row { align-items: stretch; flex-direction: column; }
@@ -157,6 +159,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   #manual-receive-form { grid-template-columns: 1fr; }
   .assignee-login-row { grid-template-columns: 1fr; }
   .assignee-session { align-items: stretch; flex-direction: column; }
+  .session-countdown { min-width: 0; }
   .history-list { overflow: visible; }
   .history-table, .history-table tbody, .history-table tr, .history-table td { display: block; width: 100%; }
   .history-table thead { display: none; }

@@ -24,6 +24,14 @@
         <span>目前身分</span>
         <strong id="role-label">一般測試人員</strong>
         <button id="role-toggle" class="link-button" type="button">切換一般人員／事務組</button>
+        <div id="assignee-session" class="assignee-session header-session" hidden>
+          <div class="login-state">
+            <strong class="login-success">✓ 已登入</strong>
+            <span>職號：<b id="current-assignee"></b></span>
+          </div>
+          <strong id="session-countdown" class="session-countdown">自動登出倒數 01:00</strong>
+          <button id="assignee-logout" class="button header-logout" type="button">登出</button>
+        </div>
       </div>
     </div>
   </header>
@@ -52,15 +60,6 @@
             <button id="assignee-login" class="button primary" type="button">登入</button>
           </div>
         </div>
-        <div id="assignee-session" class="assignee-session" hidden>
-          <div class="login-state">
-            <strong class="login-success">✓ 已登入</strong>
-            <span>目前職號：<b id="current-assignee"></b></span>
-          </div>
-          <strong id="session-countdown" class="session-countdown">自動登出倒數 01:00</strong>
-          <button id="assignee-logout" class="button secondary" type="button">登出</button>
-        </div>
-
         <div class="input-mode-switch" aria-label="文號輸入方式">
           <button id="input-mode-graphic" class="input-mode active" type="button" aria-pressed="true">圖形點選</button>
           <button id="input-mode-manual" class="input-mode" type="button" aria-pressed="false">手寫輸入文號</button>
