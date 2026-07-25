@@ -1,7 +1,8 @@
 import { initializeApp } from
   'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import {
-  getAuth,
+  inMemoryPersistence,
+  initializeAuth,
   signInAnonymously,
   signOut
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
@@ -22,7 +23,7 @@ const core = window.FirebaseStoreCore;
 if (!core) throw new Error('Firebase 資料驗證模組載入失敗。');
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+const auth = initializeAuth(app, { persistence: inMemoryPersistence });
 const database = getFirestore(app);
 let employeeNumber = '';
 
