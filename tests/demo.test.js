@@ -122,6 +122,33 @@ test('shows the five history fields and rejection employee number', () => {
   assert.match(source, /最近退文人員職號/);
 });
 
+test('groups document events into one complete workflow row', () => {
+  const grouped = app.groupHistoryByDocument([
+    {
+      documentNumber: '1151100016', action: '歸檔', actor: '7654321',
+      reason: '', occurredAt: 'T4', occurredAtMillis: 4
+    },
+    {
+      documentNumber: '1151100016', action: '承辦人收文', actor: '1115034',
+      reason: '', occurredAt: 'T1', occurredAtMillis: 1
+    },
+    {
+      documentNumber: '1151100016', action: '退文', actor: '7654321',
+      reason: '缺少發文日期', occurredAt: 'T2', occurredAtMillis: 2
+    },
+    {
+      documentNumber: '1151100016', action: '承辦人重新收文', actor: '1115034',
+      reason: '', occurredAt: 'T3', occurredAtMillis: 3
+    }
+  ]);
+  assert.equal(grouped.length, 1);
+  assert.deepEqual(grouped[0].flow, ['已收文', '已退文', '重新收文', '已歸檔']);
+  assert.deepEqual(grouped[0].reasons, ['缺少發文日期']);
+  assert.deepEqual(grouped[0].actors, ['1115034', '7654321', '1115034', '7654321']);
+  assert.equal(grouped[0].firstAt, 'T1');
+  assert.equal(grouped[0].lastAt, 'T4');
+});
+
 test('places logout and countdown in the global header', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const header = html.match(/<header>[\s\S]*?<\/header>/)[0];

@@ -187,6 +187,46 @@
     return state;
   }
 
+  function groupHistoryByDocument(events) {
+    var groups = {};
+    var flowLabels = {
+      '承辦人收文': '已收文',
+      '退文': '已退文',
+      '承辦人重新收文': '重新收文',
+      '歸檔': '已歸檔',
+      '確認收件': '已收文'
+    };
+    (events || []).forEach(function (event, index) {
+      var number = String(event.documentNumber || '');
+      if (!groups[number]) groups[number] = [];
+      var copy = Object.assign({ _order: index }, event);
+      groups[number].push(copy);
+    });
+    return Object.keys(groups).map(function (number) {
+      var ordered = groups[number].slice().sort(function (left, right) {
+        var leftTime = Number(left.occurredAtMillis);
+        var rightTime = Number(right.occurredAtMillis);
+        if (isNaN(leftTime) || isNaN(rightTime)) return left._order - right._order;
+        return leftTime - rightTime;
+      });
+      return {
+        documentNumber: number,
+        firstAt: ordered[0].occurredAt || '—',
+        lastAt: ordered[ordered.length - 1].occurredAt || '—',
+        lastAtMillis: Number(ordered[ordered.length - 1].occurredAtMillis) || 0,
+        flow: ordered.map(function (event) {
+          return flowLabels[event.action] || event.newStatus || event.action || '—';
+        }),
+        reasons: ordered.filter(function (event) { return event.reason; })
+          .map(function (event) { return event.reason; }),
+        actors: ordered.map(function (event) { return event.actor || '—'; }),
+        events: ordered
+      };
+    }).sort(function (left, right) {
+      return right.lastAtMillis - left.lastAtMillis;
+    });
+  }
+
   var api = {
     STORAGE_KEY: STORAGE_KEY,
     SESSION_TIMEOUT_MS: SESSION_TIMEOUT_MS,
@@ -204,7 +244,8 @@
     deliver: deliver,
     registerReceived: registerReceived,
     manage: manage,
-    seedState: seedState
+    seedState: seedState,
+    groupHistoryByDocument: groupHistoryByDocument
   };
 
   if (typeof document === 'undefined') return api;
@@ -501,20 +542,66 @@
     head.appendChild(headRow);
     table.appendChild(head);
     var tableBody = el('tbody');
-    state.history.slice().reverse().forEach(function (event) {
+    groupHistoryByDocument(state.history).forEach(function (group) {
       var row = el('tr');
-      [
-        event.occurredAt || '—',
-        event.documentNumber || '—',
-        event.action || '—',
-        event.reason || '—',
-        event.actor || '—'
-      ].forEach(function (value, index) {
+      var values = [
+        group.firstAt === group.lastAt ? group.firstAt : group.firstAt + ' → ' + group.lastAt,
+        group.documentNumber,
+        group.flow.join(' → '),
+        group.reasons.length ? group.reasons.join('、') : '—',
+        group.actors.join(' → ')
+      ];
+      values.forEach(function (value, index) {
         var cell = el('td', '', value);
         cell.dataset.label = headers[index];
+        if (index === 2) {
+          cell.textContent = '';
+          cell.appendChild(el('span', 'workflow-flow', value));
+          var detailButton = el('button', 'history-detail-toggle', '查看明細');
+          detailButton.type = 'button';
+          detailButton.setAttribute('aria-expanded', 'false');
+          cell.appendChild(detailButton);
+        }
         row.appendChild(cell);
       });
       tableBody.appendChild(row);
+      var detailRow = el('tr', 'history-detail-row');
+      detailRow.hidden = true;
+      var detailCell = el('td');
+      detailCell.colSpan = headers.length;
+      var detailTable = el('table', 'history-detail-table');
+      var detailHead = el('thead');
+      var detailHeadRow = el('tr');
+      headers.forEach(function (header) {
+        detailHeadRow.appendChild(el('th', '', header));
+      });
+      detailHead.appendChild(detailHeadRow);
+      detailTable.appendChild(detailHead);
+      var detailBody = el('tbody');
+      group.events.forEach(function (event) {
+        var eventRow = el('tr');
+        [
+          event.occurredAt || '—',
+          event.documentNumber || '—',
+          event.action || '—',
+          event.reason || '—',
+          event.actor || '—'
+        ].forEach(function (value, index) {
+          var eventCell = el('td', '', value);
+          eventCell.dataset.label = headers[index];
+          eventRow.appendChild(eventCell);
+        });
+        detailBody.appendChild(eventRow);
+      });
+      detailTable.appendChild(detailBody);
+      detailCell.appendChild(detailTable);
+      detailRow.appendChild(detailCell);
+      tableBody.appendChild(detailRow);
+      row.querySelector('.history-detail-toggle').addEventListener('click', function (event) {
+        detailRow.hidden = !detailRow.hidden;
+        event.currentTarget.setAttribute('aria-expanded', String(!detailRow.hidden));
+        event.currentTarget.textContent = detailRow.hidden ? '查看明細' : '收合明細';
+      });
     });
     table.appendChild(tableBody);
     body.appendChild(table);
