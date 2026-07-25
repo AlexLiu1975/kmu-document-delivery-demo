@@ -170,7 +170,10 @@
     var reason = action === 'REJECT' ? validateRejectionReason(category, detail) : '';
     document.status = nextStatus(oldStatus, action);
     document.updatedAt = nowText();
-    if (reason) document.latestRejectionReason = reason;
+    if (reason) {
+      document.latestRejectionReason = reason;
+      document.latestRejectionActor = normalizeAssignee(actor);
+    }
     var labels = { RECEIVE: '確認收件', REJECT: '退文', ARCHIVE: '歸檔' };
     addHistory(state, document, labels[action], oldStatus, actor, reason);
     return state;
@@ -180,7 +183,7 @@
     var state = emptyState();
     state = deliver(state, '測試秘字第115000001號', '一般測試人員');
     state = deliver(state, '測試秘字第115000002號', '一般測試人員');
-    state = manage(state, state.documents[1].id, 'REJECT', '缺少校對章', '', '事務組測試人員');
+    state = manage(state, state.documents[1].id, 'REJECT', '缺少校對章', '', '7654321');
     return state;
   }
 
@@ -439,7 +442,7 @@
       if (!canAccessStaff(role, currentAssignee)) {
         throw new Error('請先以事務組身分登入。');
       }
-      state = manage(state, id, action, '', '', '事務組測試人員');
+      state = manage(state, id, action, '', '', currentAssignee);
       saveState(state);
       renderAll();
       notify(action === 'RECEIVE' ? '收件完成。' : '歸檔完成。');
@@ -592,7 +595,7 @@
         throw new Error('請先以事務組身分登入。');
       }
       state = manage(state, selectedRejectId, 'REJECT', byId('reason').value,
-        byId('other').value, '事務組測試人員');
+        byId('other').value, currentAssignee);
       saveState(state);
       byId('reject-dialog').close();
       event.currentTarget.reset();

@@ -34,20 +34,23 @@ test('validates the fixed rejection reasons', () => {
 test('allows staff to reject a received document with a fixed reason', () => {
   let state = app.registerReceived(app.emptyState(), '1151100500', '1115034');
   const id = state.documents[0].id;
-  state = app.manage(state, id, 'REJECT', '缺少發文日期', '', '事務組測試人員');
+  state = app.manage(state, id, 'REJECT', '缺少發文日期', '', '7654321');
   assert.equal(state.documents[0].status, '已退文');
   assert.equal(state.documents[0].latestRejectionReason, '缺少發文日期');
+  assert.equal(state.documents[0].latestRejectionActor, '7654321');
   assert.equal(state.history[1].action, '退文');
+  assert.equal(state.history[1].actor, '7654321');
+  assert.equal(state.history[1].reason, '缺少發文日期');
 });
 
 test('creates, rejects, redelivers, receives, and archives immutable history', () => {
   let state = app.emptyState();
   state = app.deliver(state, '測試字第1號', '一般測試人員');
   const id = state.documents[0].id;
-  state = app.manage(state, id, 'REJECT', '缺少校對章', '', '事務組測試人員');
+  state = app.manage(state, id, 'REJECT', '缺少校對章', '', '7654321');
   state = app.deliver(state, '測試字第1號', '一般測試人員');
-  state = app.manage(state, id, 'RECEIVE', '', '', '事務組測試人員');
-  state = app.manage(state, id, 'ARCHIVE', '', '', '事務組測試人員');
+  state = app.manage(state, id, 'RECEIVE', '', '', '7654321');
+  state = app.manage(state, id, 'ARCHIVE', '', '', '7654321');
   assert.equal(state.documents[0].status, '已歸檔');
   assert.equal(state.documents[0].latestRejectionReason, '缺少校對章');
   assert.deepEqual(
@@ -83,7 +86,7 @@ test('registers received documents with a seven-digit employee number', () => {
 test('allows a rejected document to be received again', () => {
   let state = app.registerReceived(app.emptyState(), '1151100016', '1115034');
   const id = state.documents[0].id;
-  state = app.manage(state, id, 'REJECT', '缺少發文日期', '', '事務組測試人員');
+  state = app.manage(state, id, 'REJECT', '缺少發文日期', '', '7654321');
   state = app.registerReceived(state, '1151100016', '1115034');
 
   assert.equal(state.documents[0].status, '已收文');
