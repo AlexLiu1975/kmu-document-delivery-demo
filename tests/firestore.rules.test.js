@@ -9,9 +9,12 @@ const {
   initializeTestEnvironment
 } = require('@firebase/rules-unit-testing');
 const {
+  collectionGroup,
   deleteDoc,
   doc,
+  getDocs,
   getDoc,
+  query,
   setDoc,
   Timestamp,
   updateDoc
@@ -139,4 +142,15 @@ test('allows event creation but denies event update and delete', async () => {
     doc(db, 'documents/1151100016/events/event-2'),
     eventData('different-uid')
   ));
+});
+
+test('allows authenticated collection-group reads of operation events', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(
+      doc(context.firestore(), 'documents/1151100016/events/event-1'),
+      eventData('uid-a')
+    );
+  });
+  const db = environment.authenticatedContext('uid-a').firestore();
+  await assertSucceeds(getDocs(query(collectionGroup(db, 'events'))));
 });

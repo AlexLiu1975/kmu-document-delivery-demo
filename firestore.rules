@@ -116,5 +116,9 @@ service cloud.firestore {
         allow update, delete: if false;
       }
     }
+
+    match /{path=**}/events/{eventId} {
+      allow read: if signedIn();
+    }
   }
 }
