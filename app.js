@@ -260,8 +260,9 @@
       ['首次送達', record.firstDeliveredAt],
       ['最近送達', record.lastDeliveredAt],
       ['最後更新', record.updatedAt],
-      ['職號', record.assignee || '—'],
-      ['最近退文原因', record.latestRejectionReason || '—']
+      ['收文職號', record.assignee || '—'],
+      ['最近退文原因', record.latestRejectionReason || '—'],
+      ['最近退文人員職號', record.latestRejectionActor || '—']
     ].forEach(function (pair) {
       var row = el('div', 'record-row');
       row.appendChild(el('span', 'record-label', pair[0]));
@@ -454,14 +455,33 @@
   function renderHistory() {
     var body = byId('history-list');
     clear(body);
-    state.history.slice().reverse().forEach(function (event) {
-      var item = el('div', 'history-item');
-      item.appendChild(el('strong', '', event.action + ' · ' + event.documentNumber));
-      item.appendChild(el('span', '', (event.oldStatus || '新案件') + ' → ' + event.newStatus));
-      item.appendChild(el('small', '', event.occurredAt + ' · ' + event.actor +
-        (event.reason ? ' · ' + event.reason : '')));
-      body.appendChild(item);
+    var headers = ['日期時間', '公文文號', '動作', '退文原因', '操作帳號'];
+    var table = el('table', 'history-table');
+    var head = el('thead');
+    var headRow = el('tr');
+    headers.forEach(function (header) {
+      headRow.appendChild(el('th', '', header));
     });
+    head.appendChild(headRow);
+    table.appendChild(head);
+    var tableBody = el('tbody');
+    state.history.slice().reverse().forEach(function (event) {
+      var row = el('tr');
+      [
+        event.occurredAt || '—',
+        event.documentNumber || '—',
+        event.action || '—',
+        event.reason || '—',
+        event.actor || '—'
+      ].forEach(function (value, index) {
+        var cell = el('td', '', value);
+        cell.dataset.label = headers[index];
+        row.appendChild(cell);
+      });
+      tableBody.appendChild(row);
+    });
+    table.appendChild(tableBody);
+    body.appendChild(table);
   }
 
   function renderAll() {

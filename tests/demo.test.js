@@ -112,6 +112,16 @@ test('does not carry a logged-in employee session into staff access', () => {
   assert.equal(app.canAccessStaff('staff', '1115034'), true);
 });
 
+test('shows the five history fields and rejection employee number', () => {
+  const source = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  assert.match(source, /日期時間/);
+  assert.match(source, /公文文號/);
+  assert.match(source, /動作/);
+  assert.match(source, /退文原因/);
+  assert.match(source, /操作帳號/);
+  assert.match(source, /最近退文人員職號/);
+});
+
 test('page is a dependency-free GitHub Pages demo', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.match(html, /公開測試版/);
