@@ -1,0 +1,120 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function validDocumentNumber(value) {
+      return value is string && value.matches('^[0-9]{10}$');
+    }
+
+    function validEmployeeNumber(value) {
+      return value is string && value.matches('^[0-9]{7}$');
+    }
+
+    function validOptionalEmployeeNumber(value) {
+      return value == '' || validEmployeeNumber(value);
+    }
+
+    function validStatus(value) {
+      return value in ['已收文', '已退文', '已歸檔'];
+    }
+
+    function validDocument(data, documentNumber) {
+      return data.keys().hasOnly([
+          'documentNumber', 'year', 'typeCode', 'serial', 'status',
+          'assignee', 'latestRejectionReason', 'latestRejectionActor',
+          'createdAt', 'updatedAt', 'revision'
+        ])
+        && validDocumentNumber(documentNumber)
+        && data.documentNumber == documentNumber
+        && data.year is string
+        && data.year.matches('^[0-9]{3}$')
+        && data.typeCode is string
+        && data.typeCode.matches('^[0-9]{3}$')
+        && data.serial is string
+        && data.serial.matches('^[0-9]{4}$')
+        && data.documentNumber == data.year + data.typeCode + data.serial
+        && validStatus(data.status)
+        && validEmployeeNumber(data.assignee)
+        && data.latestRejectionReason is string
+        && data.latestRejectionReason.size() <= 200
+        && validOptionalEmployeeNumber(data.latestRejectionActor)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && data.revision is int
+        && data.revision >= 1;
+    }
+
+    function validTransition(oldStatus, newStatus) {
+      return (oldStatus == '已收文' && newStatus == '已退文')
+        || (oldStatus == '已退文' && newStatus == '已收文')
+        || (oldStatus == '已收文' && newStatus == '已歸檔');
+    }
+
+    function immutableDocumentFields() {
+      return request.resource.data.documentNumber == resource.data.documentNumber
+        && request.resource.data.year == resource.data.year
+        && request.resource.data.typeCode == resource.data.typeCode
+        && request.resource.data.serial == resource.data.serial
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validEvent(data, documentNumber) {
+      return data.keys().hasOnly([
+          'documentNumber', 'action', 'oldStatus', 'newStatus',
+          'reason', 'actor', 'authUid', 'occurredAt'
+        ])
+        && data.documentNumber == documentNumber
+        && validDocumentNumber(data.documentNumber)
+        && validEmployeeNumber(data.actor)
+        && data.authUid == request.auth.uid
+        && data.occurredAt is timestamp
+        && data.reason is string
+        && data.reason.size() <= 200
+        && (
+          (data.action == '承辦人收文'
+            && data.oldStatus == ''
+            && data.newStatus == '已收文'
+            && data.reason == '')
+          || (data.action == '退文'
+            && data.oldStatus == '已收文'
+            && data.newStatus == '已退文'
+            && data.reason.size() > 0)
+          || (data.action == '承辦人重新收文'
+            && data.oldStatus == '已退文'
+            && data.newStatus == '已收文'
+            && data.reason == '')
+          || (data.action == '歸檔'
+            && data.oldStatus == '已收文'
+            && data.newStatus == '已歸檔'
+            && data.reason == '')
+        );
+    }
+
+    match /documents/{documentNumber} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && validDocument(request.resource.data, documentNumber)
+        && request.resource.data.status == '已收文'
+        && request.resource.data.revision == 1
+        && request.resource.data.latestRejectionReason == ''
+        && request.resource.data.latestRejectionActor == '';
+      allow update: if signedIn()
+        && validDocument(request.resource.data, documentNumber)
+        && immutableDocumentFields()
+        && validTransition(resource.data.status, request.resource.data.status)
+        && request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+
+      match /events/{eventId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && validEvent(request.resource.data, documentNumber);
+        allow update, delete: if false;
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/demo.test.js tests/firebase-store.test.js",
+    "test:rules": "firebase emulators:exec --only firestore \"node --test tests/firestore.rules.test.js\"",
+    "test:all": "npm test && npm run test:rules"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.1",
+    "firebase": "12.16.0",
+    "firebase-tools": "15.24.0"
+  }
+}
