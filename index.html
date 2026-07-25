@@ -9,7 +9,7 @@
 </head>
 <body>
   <div class="demo-banner">
-    公開測試版｜不連接正式系統，資料僅儲存在目前瀏覽器 localStorage
+    公開測試版｜Firebase 共用測試資料｜請勿輸入真實公文或個人資料
   </div>
   <header>
     <div class="header-inner">
@@ -38,6 +38,7 @@
   <main>
     <section class="info">
       <strong>安全提醒：</strong>請勿輸入真實公文文號或個人資料。本頁只用於操作流程測試。
+      <span id="connection-status" class="connection-status" data-state="connecting">Firebase 連線中</span>
     </section>
     <nav class="tabs" role="tablist" aria-label="主要功能">
       <button class="tab active" role="tab" aria-selected="true" data-panel="deliver">收文登記</button>
@@ -127,7 +128,8 @@
           <h2>查詢公文進度</h2>
           <p>請輸入完整測試文號。</p>
           <label for="query-number">公文文號</label>
-          <input id="query-number" maxlength="100" required placeholder="可查：測試秘字第115000001號">
+          <input id="query-number" inputmode="numeric" maxlength="10" pattern="[0-9]{10}"
+            required placeholder="例如：1151100016">
           <button class="button primary" type="submit">查詢進度</button>
         </form>
         <div class="card">
@@ -142,20 +144,15 @@
       <div class="card">
         <span class="eyebrow">事務組功能</span>
         <h2>待處理案件</h2>
-        <p>可確認收件、退文或將已收文案件歸檔。</p>
+        <p>可退文或將已收文案件歸檔。</p>
         <div id="manage-list" class="case-list"></div>
       </div>
     </section>
 
     <section class="panel" id="panel-history">
       <div class="card">
-        <div class="heading-row">
-          <div>
-            <span class="eyebrow">測試資料</span>
-            <h2>操作歷程</h2>
-          </div>
-          <button id="reset-data" class="button secondary" type="button">重設測試資料</button>
-        </div>
+        <span class="eyebrow">Firebase 共用測試資料</span>
+        <h2>操作歷程</h2>
         <div id="history-list" class="history-list"></div>
       </div>
     </section>
@@ -185,6 +182,8 @@
     </form>
   </dialog>
   <div id="toast" class="toast" aria-live="polite"></div>
+  <script src="firebase-store-core.js"></script>
+  <script type="module" src="firebase-store.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

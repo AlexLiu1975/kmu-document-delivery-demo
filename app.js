@@ -187,19 +187,6 @@
     return state;
   }
 
-  function loadState() {
-    try {
-      var saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : seedState();
-    } catch (error) {
-      return seedState();
-    }
-  }
-
-  function saveState(state) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }
-
   var api = {
     STORAGE_KEY: STORAGE_KEY,
     SESSION_TIMEOUT_MS: SESSION_TIMEOUT_MS,
@@ -222,7 +209,7 @@
 
   if (typeof document === 'undefined') return api;
 
-  var state = loadState();
+  var state = emptyState();
   var role = 'general';
   var selectedRejectId = '';
   var inputMode = 'graphic';
@@ -231,6 +218,9 @@
   var sessionTimer = null;
   var sessionInterval = null;
   var sessionDeadline = 0;
+  var firebaseStore = null;
+  var unsubscribeFirebase = null;
+  var lastReceivedNumber = '';
   var byId = function (id) { return document.getElementById(id); };
 
   function el(tag, className, text) {
@@ -252,13 +242,32 @@
     window.setTimeout(function () { box.classList.remove('show'); }, 3600);
   }
 
+  function setConnectionStatus(stateName, text) {
+    var status = byId('connection-status');
+    status.dataset.state = stateName;
+    status.textContent = text;
+  }
+
+  function firebaseErrorMessage(error) {
+    var code = error && error.code ? String(error.code) : '';
+    if (code.indexOf('auth/operation-not-allowed') >= 0) {
+      return 'Firebase 尚未啟用匿名登入，請先在 Authentication 開啟 Anonymous。';
+    }
+    if (code.indexOf('permission-denied') >= 0) {
+      return 'Firestore 權限不足，請確認資料庫與安全規則已部署。';
+    }
+    if (code.indexOf('unavailable') >= 0) {
+      return 'Firebase 目前無法連線，資料尚未同步。';
+    }
+    return error && error.message ? error.message : 'Firebase 操作失敗。';
+  }
+
   function recordCard(record) {
     var card = el('div', 'record');
     [
       ['文號', record.documentNumber],
       ['目前狀態', record.status],
-      ['首次送達', record.firstDeliveredAt],
-      ['最近送達', record.lastDeliveredAt],
+      ['建立時間', record.createdAt || '—'],
       ['最後更新', record.updatedAt],
       ['收文職號', record.assignee || '—'],
       ['最近退文原因', record.latestRejectionReason || '—'],
@@ -281,7 +290,7 @@
   }
 
   function findDocument(number) {
-    return state.documents.find(function (item) { return item.index === number; });
+    return state.documents.find(function (item) { return item.documentNumber === number; });
   }
 
   function indexStatusClass(number) {
@@ -344,15 +353,29 @@
     byId('session-countdown').textContent = '自動登出倒數 ' + formatCountdown(seconds);
   }
 
-  function logoutAssignee(isAutomatic) {
+  async function logoutAssignee(isAutomatic) {
     currentAssignee = '';
     if (sessionTimer) window.clearTimeout(sessionTimer);
     if (sessionInterval) window.clearInterval(sessionInterval);
     sessionTimer = null;
     sessionInterval = null;
     sessionDeadline = 0;
+    if (unsubscribeFirebase) {
+      unsubscribeFirebase();
+      unsubscribeFirebase = null;
+    }
+    state = emptyState();
     byId('assignee').value = '';
     renderAll();
+    if (firebaseStore) {
+      try {
+        await firebaseStore.logout();
+        setConnectionStatus('ready', 'Firebase 已連線，請登入職號');
+      } catch (error) {
+        setConnectionStatus('error', 'Firebase 登出失敗');
+        notify(firebaseErrorMessage(error), true);
+      }
+    }
     if (isAutomatic) notify('閒置超過1分鐘，已自動登出。');
   }
 
@@ -369,11 +392,32 @@
     updateSessionCountdown();
   }
 
-  function loginAssignee() {
-    currentAssignee = normalizeAssignee(byId('assignee').value);
+  function startFirebaseSubscription() {
+    if (unsubscribeFirebase) unsubscribeFirebase();
+    unsubscribeFirebase = firebaseStore.subscribe(function (nextState) {
+      state = nextState;
+      setConnectionStatus('synced', 'Firebase 已同步');
+      renderAll();
+      if (lastReceivedNumber && findDocument(lastReceivedNumber)) {
+        showReceivedResult(lastReceivedNumber);
+        lastReceivedNumber = '';
+      }
+    }, function (error) {
+      setConnectionStatus('error', '離線／尚未同步');
+      notify(firebaseErrorMessage(error), true);
+    });
+  }
+
+  async function loginAssignee() {
+    if (!firebaseStore) throw new Error('Firebase 尚在連線中，請稍後再試。');
+    var employeeNumber = normalizeAssignee(byId('assignee').value);
+    setConnectionStatus('connecting', 'Firebase 登入中');
+    await firebaseStore.login(employeeNumber);
+    currentAssignee = employeeNumber;
+    startFirebaseSubscription();
     resetSessionTimer();
     renderAll();
-    notify('職號 ' + currentAssignee + ' 已登入。');
+    notify('職號 ' + currentAssignee + ' 已登入 Firebase 測試資料。');
   }
 
   function showReceivedResult(number) {
@@ -382,12 +426,11 @@
     byId('deliver-result').appendChild(recordCard(record));
   }
 
-  function runRegisterReceived(number) {
+  async function runRegisterReceived(number) {
     if (!currentAssignee) throw new Error('請先輸入職號並登入。');
-    state = registerReceived(state, number, currentAssignee);
-    saveState(state);
-    showReceivedResult(number);
-    renderAll();
+    var normalized = normalizeIndexDocumentNumber(number);
+    lastReceivedNumber = normalized;
+    await firebaseStore.receive(normalized, currentAssignee);
     notify('已登記為已收文。');
   }
 
@@ -396,7 +439,7 @@
     clear(body);
     if (!canAccessStaff(role, currentAssignee)) return;
     var records = state.documents.filter(function (item) {
-      return item.status === STATUS.DELIVERED || item.status === STATUS.RECEIVED;
+      return item.status === STATUS.RECEIVED;
     });
     if (!records.length) {
       body.appendChild(el('p', 'empty', '目前沒有待處理案件。'));
@@ -412,17 +455,11 @@
       info.appendChild(el('small', '', '最後更新：' + record.updatedAt));
       row.appendChild(info);
       var actions = el('div', 'row-actions');
-      if (record.status === STATUS.DELIVERED) {
-        actions.appendChild(actionButton('確認收件', 'primary', function () {
-          runManage(record.id, 'RECEIVE');
-        }));
-      } else {
-        actions.appendChild(actionButton('歸檔', 'primary', function () {
-          runManage(record.id, 'ARCHIVE');
-        }));
-      }
+      actions.appendChild(actionButton('歸檔', 'primary', function () {
+        runManage(record.documentNumber, 'ARCHIVE');
+      }));
       actions.appendChild(actionButton('退文', 'danger', function () {
-        selectedRejectId = record.id;
+        selectedRejectId = record.documentNumber;
         byId('reject-doc').textContent = '文號：' + record.documentNumber;
         byId('reject-dialog').showModal();
       }));
@@ -438,15 +475,14 @@
     return button;
   }
 
-  function runManage(id, action) {
+  async function runManage(documentNumber, action) {
     try {
       if (!canAccessStaff(role, currentAssignee)) {
         throw new Error('請先以事務組身分登入。');
       }
-      state = manage(state, id, action, '', '', currentAssignee);
-      saveState(state);
-      renderAll();
-      notify(action === 'RECEIVE' ? '收件完成。' : '歸檔完成。');
+      if (action !== 'ARCHIVE') throw new Error('不支援的管理操作。');
+      await firebaseStore.archive(documentNumber, currentAssignee);
+      notify('歸檔完成。');
     } catch (error) {
       notify(error.message, true);
     }
@@ -522,20 +558,20 @@
     notify('已切換為' + byId('role-label').textContent + '。');
   });
 
-  byId('manual-receive-form').addEventListener('submit', function (event) {
+  byId('manual-receive-form').addEventListener('submit', async function (event) {
     event.preventDefault();
     try {
       var number = byId('manual-document-number').value;
-      runRegisterReceived(number);
+      await runRegisterReceived(number);
       byId('manual-document-number').value = '';
     } catch (error) {
       notify(error.message, true);
     }
   });
 
-  byId('assignee-login').addEventListener('click', function () {
+  byId('assignee-login').addEventListener('click', async function () {
     try {
-      loginAssignee();
+      await loginAssignee();
     } catch (error) {
       notify(error.message, true);
     }
@@ -545,8 +581,8 @@
     event.preventDefault();
     byId('assignee-login').click();
   });
-  byId('assignee-logout').addEventListener('click', function () {
-    logoutAssignee(false);
+  byId('assignee-logout').addEventListener('click', async function () {
+    await logoutAssignee(false);
     notify('已登出。');
   });
   ['click', 'keydown', 'pointerdown', 'touchstart'].forEach(function (eventName) {
@@ -579,11 +615,11 @@
     byId('index-page').value = clampIndexPage(byId('index-page').value) + 1;
     renderMatrix();
   });
-  byId('document-matrix').addEventListener('click', function (event) {
+  byId('document-matrix').addEventListener('click', async function (event) {
     var button = event.target.closest('[data-document-number]');
     if (!button) return;
     try {
-      runRegisterReceived(button.dataset.documentNumber);
+      await runRegisterReceived(button.dataset.documentNumber);
     } catch (error) {
       notify(error.message, true);
     }
@@ -594,8 +630,8 @@
     var result = byId('query-result');
     clear(result);
     try {
-      var index = normalizeDocumentNumber(byId('query-number').value);
-      var record = state.documents.find(function (item) { return item.index === index; });
+      var index = normalizeIndexDocumentNumber(byId('query-number').value);
+      var record = findDocument(index);
       result.appendChild(record ? recordCard(record) : el('p', 'empty', '查無此文號資料。'));
     } catch (error) {
       notify(error.message, true);
@@ -608,15 +644,14 @@
     byId('other').required = !other.hidden;
   });
 
-  byId('reject-form').addEventListener('submit', function (event) {
+  byId('reject-form').addEventListener('submit', async function (event) {
     event.preventDefault();
     try {
       if (!canAccessStaff(role, currentAssignee)) {
         throw new Error('請先以事務組身分登入。');
       }
-      state = manage(state, selectedRejectId, 'REJECT', byId('reason').value,
-        byId('other').value, currentAssignee);
-      saveState(state);
+      var reason = validateRejectionReason(byId('reason').value, byId('other').value);
+      await firebaseStore.reject(selectedRejectId, currentAssignee, reason);
       byId('reject-dialog').close();
       event.currentTarget.reset();
       byId('other-wrap').hidden = true;
@@ -628,16 +663,20 @@
   });
 
   byId('cancel-reject').addEventListener('click', function () { byId('reject-dialog').close(); });
-  byId('reset-data').addEventListener('click', function () {
-    if (!window.confirm('確定重設目前瀏覽器中的所有測試資料？')) return;
-    state = seedState();
-    saveState(state);
-    clear(byId('deliver-result'));
-    clear(byId('query-result'));
-    renderAll();
-    notify('測試資料已重設。');
-  });
 
   renderAll();
+  function connectFirebaseStore() {
+    firebaseStore = window.firebaseDocumentStore;
+    if (!firebaseStore) {
+      setConnectionStatus('error', 'Firebase 設定未完成');
+      return;
+    }
+    setConnectionStatus('ready', 'Firebase 已連線，請登入職號');
+  }
+  window.addEventListener('firebase-store-ready', connectFirebaseStore, { once: true });
+  if (window.firebaseDocumentStore) connectFirebaseStore();
+  window.setTimeout(function () {
+    if (!firebaseStore) setConnectionStatus('error', 'Firebase 設定未完成');
+  }, 8000);
   return api;
 });

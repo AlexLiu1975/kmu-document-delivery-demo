@@ -132,13 +132,16 @@ test('places logout and countdown in the global header', () => {
   assert.doesNotMatch(deliverPanel, /id="assignee-session"/);
 });
 
-test('page is a dependency-free GitHub Pages demo', () => {
+test('uses Firebase as the only shared data source', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
   assert.match(html, /公開測試版/);
-  assert.match(html, /localStorage/);
+  assert.match(html, /type="module" src="firebase-store\.js"/);
+  assert.match(html, /Firebase 共用測試資料/);
+  assert.doesNotMatch(html, /資料僅儲存在目前瀏覽器 localStorage/);
   assert.match(html, /一般人員/);
   assert.match(html, /事務組/);
-  assert.match(html, /重設測試資料/);
+  assert.doesNotMatch(html, /重設測試資料/);
   assert.match(html, /id="assignee"/);
   assert.match(html, /id="assignee-login"/);
   assert.match(html, /id="assignee-logout"/);
@@ -158,6 +161,8 @@ test('page is a dependency-free GitHub Pages demo', () => {
   assert.match(html, /<option value="其它">其它：<\/option>/);
   assert.doesNotMatch(html, /google\.script\.run/);
   assert.doesNotMatch(html, /@kmu\.edu\.tw/);
-  assert.doesNotMatch(html, /<script[^>]+src=["']https?:/i);
   assert.doesNotMatch(html, /<link[^>]+href=["']https?:/i);
+  assert.doesNotMatch(source, /localStorage\.setItem/);
+  assert.doesNotMatch(source, /localStorage\.getItem/);
+  assert.match(source, /firebaseDocumentStore/);
 });

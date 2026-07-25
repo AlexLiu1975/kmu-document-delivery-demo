@@ -30,6 +30,14 @@ h1 { margin: 0; font-size: clamp(1.2rem, 3vw, 1.7rem); }
 .link-button:disabled { color: #91a5ae; cursor: not-allowed; text-decoration: none; }
 main { padding: 24px 0 48px; }
 .info { margin-bottom: 17px; padding: 12px 15px; border: 1px solid #cfdee4; border-radius: 12px; background: #ffffffb8; color: #405963; }
+.connection-status {
+  display: inline-flex; margin-left: 10px; padding: 3px 9px; border-radius: 999px;
+  color: #765600; background: #fff0bd; font-size: .82rem; font-weight: 800;
+}
+.connection-status[data-state="ready"], .connection-status[data-state="synced"] {
+  color: #175f3b; background: #dff3e7;
+}
+.connection-status[data-state="error"] { color: #8f2929; background: #ffe2e2; }
 .tabs { display: flex; gap: 6px; padding: 6px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: #ffffffbd; }
 .tab { flex: 1 0 auto; padding: 8px 16px; border: 0; border-radius: 9px; color: var(--muted); background: none; font-weight: 750; cursor: pointer; }
 .tab.active { color: white; background: var(--navy); }
