@@ -143,13 +143,25 @@ textarea { min-height: 92px; resize: vertical; }
   min-height: 58px; padding: 7px 5px; border: 1px solid var(--line); border-radius: 9px;
   background: white; font: 800 13px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   text-align: center; white-space: nowrap; cursor: pointer;
+  position: relative;
 }
 .document-cell:hover { border-color: var(--teal); box-shadow: 0 4px 12px rgba(18,59,93,.11); }
-.index-pending { color: #737d83; }
-.index-received { color: #c73636; }
-.index-archived { color: #24744a; }
-.document-cell.index-received { border-color: #edb6b6; background: #fff6f6; }
-.document-cell.index-archived { border-color: #b9dbc6; background: #f2faf5; }
+.index-pending { color: #647580; }
+.index-received { color: #b91c1c; }
+.index-archived { color: #15803d; }
+.document-cell.index-received {
+  border: 2px solid #d64545; background: #fbdada; color: #7f1d1d;
+}
+.document-cell.index-archived {
+  border: 2px solid #2f9e5c; background: #d3f2e0; color: #14532d;
+}
+/* Shape cues so status isn't conveyed by color alone (helps with red/green color-blindness) */
+.document-cell.index-received::after,
+.document-cell.index-archived::after {
+  position: absolute; top: 2px; right: 5px; font-size: 10px; line-height: 1;
+}
+.document-cell.index-received::after { content: "●"; color: #b91c1c; }
+.document-cell.index-archived::after { content: "✓"; color: #15803d; font-weight: 900; }
 #manual-receive-form { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
 #manual-receive-form label { grid-column: 1 / -1; margin-bottom: -4px; }
 .status-legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 16px; font-weight: 800; }
