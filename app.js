@@ -198,7 +198,7 @@
       });
     }
     return records.slice().sort(function (left, right) {
-      return String(left.updatedAt).localeCompare(String(right.updatedAt));
+      return String(right.updatedAt).localeCompare(String(left.updatedAt));
     });
   }
 
