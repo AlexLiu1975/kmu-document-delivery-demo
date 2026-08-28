@@ -6,7 +6,7 @@
   'use strict';
 
   var STORAGE_KEY = 'kmu-document-delivery-demo-v1';
-  var SESSION_TIMEOUT_MS = 60000;
+  var SESSION_TIMEOUT_MS = 600000;
   var REASONS = ['缺少發文日期', '缺少已用印信章', '缺少監印章', '缺少校對章', '其它'];
   var STATUS = { DELIVERED: '已送達', RECEIVED: '已收文', REJECTED: '已退文', ARCHIVED: '已歸檔' };
 
@@ -271,6 +271,11 @@
     return node;
   }
 
+  function statusLabel(status) {
+    if (status === STATUS.RECEIVED) return '事務組簽收';
+    return status;
+  }
+
   function clear(node) {
     while (node.firstChild) node.removeChild(node.firstChild);
   }
@@ -300,28 +305,49 @@
     if (code.indexOf('unavailable') >= 0) {
       return 'Firebase 目前無法連線，資料尚未同步。';
     }
+    if (code.indexOf('failed-precondition') >= 0) {
+      return 'Firestore 缺少必要索引，請部署 firestore.indexes.json 或依主控台連結建立索引。';
+    }
     return error && error.message ? error.message : 'Firebase 操作失敗。';
   }
 
   function recordCard(record) {
-    var card = el('div', 'record');
-    [
-      ['文號', record.documentNumber],
-      ['目前狀態', record.status],
-      ['建立時間', record.createdAt || '—'],
-      ['最後更新', record.updatedAt],
-      ['收文職號', record.assignee || '—'],
-      ['最近退文原因', record.latestRejectionReason || '—'],
-      ['最近退文人員職號', record.latestRejectionActor || '—']
-    ].forEach(function (pair) {
-      var row = el('div', 'record-row');
-      row.appendChild(el('span', 'record-label', pair[0]));
-      var value = el('strong', pair[0] === '目前狀態' ? 'badge' : '', pair[1]);
-      if (pair[0] === '目前狀態') value.dataset.status = pair[1];
-      row.appendChild(value);
-      card.appendChild(row);
+    var headers = ['文號', '目前狀態', '登錄時間', '登錄職號', '最後更新', '最近退文原因', '退文人員職號'];
+    var values = [
+      record.documentNumber,
+      statusLabel(record.status),
+      record.createdAt || '—',
+      record.assignee || '—',
+      record.updatedAt || '—',
+      record.latestRejectionReason || '—',
+      record.latestRejectionActor || '—'
+    ];
+    var wrap = el('div', 'history-list');
+    var table = el('table', 'history-table');
+    var head = el('thead');
+    var headRow = el('tr');
+    headers.forEach(function (header) {
+      headRow.appendChild(el('th', '', header));
     });
-    return card;
+    head.appendChild(headRow);
+    table.appendChild(head);
+    var body = el('tbody');
+    var row = el('tr');
+    values.forEach(function (value, index) {
+      var cell = el('td', '', value);
+      cell.dataset.label = headers[index];
+      if (index === 1) {
+        cell.textContent = '';
+        var badge = el('strong', 'badge', value);
+        badge.dataset.status = record.status;
+        cell.appendChild(badge);
+      }
+      row.appendChild(cell);
+    });
+    body.appendChild(row);
+    table.appendChild(body);
+    wrap.appendChild(table);
+    return wrap;
   }
 
   function clampIndexPage(value) {
@@ -417,7 +443,7 @@
         notify(firebaseErrorMessage(error), true);
       }
     }
-    if (isAutomatic) notify('閒置超過1分鐘，已自動登出。');
+    if (isAutomatic) notify('閒置超過10分鐘，已自動登出。');
   }
 
   function resetSessionTimer() {
@@ -472,7 +498,7 @@
     var normalized = normalizeIndexDocumentNumber(number);
     lastReceivedNumber = normalized;
     await firebaseStore.receive(normalized, currentAssignee);
-    notify('已登記為已收文。');
+    notify('已登記為事務組簽收。');
   }
 
   function renderManage() {
@@ -490,7 +516,7 @@
       var row = el('article', 'case-row');
       var info = el('div');
       info.appendChild(el('strong', '', record.documentNumber));
-      var badge = el('span', 'badge', record.status);
+      var badge = el('span', 'badge', statusLabel(record.status));
       badge.dataset.status = record.status;
       info.appendChild(badge);
       info.appendChild(el('small', '', '最後更新：' + record.updatedAt));
