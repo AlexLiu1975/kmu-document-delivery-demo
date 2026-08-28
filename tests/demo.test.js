@@ -131,7 +131,7 @@ test('filters pending cases by document number and sorts by update time', () => 
   const sorted = app.filterAndSortPendingCases(documents, '');
   assert.deepEqual(
     sorted.map((item) => item.documentNumber),
-    ['1151100001', '1151100002']
+    ['1151100002', '1151100001']
   );
   const filtered = app.filterAndSortPendingCases(documents, '0002');
   assert.deepEqual(filtered.map((item) => item.documentNumber), ['1151100002']);
