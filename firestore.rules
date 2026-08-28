@@ -14,6 +14,10 @@ service cloud.firestore {
       return value is string && value.matches('^[0-9]{7}$');
     }
 
+    function isStaffEmployee(value) {
+      return value in ['1107054', '1115034'];
+    }
+
     function validOptionalEmployeeNumber(value) {
       return value == '' || validEmployeeNumber(value);
     }
@@ -82,7 +86,8 @@ service cloud.firestore {
           || (data.action == '退文'
             && data.oldStatus == '已收文'
             && data.newStatus == '已退文'
-            && data.reason.size() > 0)
+            && data.reason.size() > 0
+            && isStaffEmployee(data.actor))
           || (data.action == '承辦人重新收文'
             && data.oldStatus == '已退文'
             && data.newStatus == '已收文'
@@ -90,7 +95,8 @@ service cloud.firestore {
           || (data.action == '歸檔'
             && data.oldStatus == '已收文'
             && data.newStatus == '已歸檔'
-            && data.reason == '')
+            && data.reason == ''
+            && isStaffEmployee(data.actor))
         );
     }
 
