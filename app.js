@@ -187,6 +187,21 @@
     return state;
   }
 
+  function filterAndSortPendingCases(documents, query) {
+    var normalizedQuery = String(query || '').trim();
+    var records = (documents || []).filter(function (item) {
+      return item.status === STATUS.RECEIVED;
+    });
+    if (normalizedQuery) {
+      records = records.filter(function (item) {
+        return String(item.documentNumber || '').indexOf(normalizedQuery) >= 0;
+      });
+    }
+    return records.slice().sort(function (left, right) {
+      return String(left.updatedAt).localeCompare(String(right.updatedAt));
+    });
+  }
+
   function groupHistoryByDocument(events) {
     var groups = {};
     var flowLabels = {
@@ -245,13 +260,15 @@
     registerReceived: registerReceived,
     manage: manage,
     seedState: seedState,
-    groupHistoryByDocument: groupHistoryByDocument
+    groupHistoryByDocument: groupHistoryByDocument,
+    filterAndSortPendingCases: filterAndSortPendingCases
   };
 
   if (typeof document === 'undefined') return api;
 
   var state = emptyState();
   var role = 'general';
+  var manageSearchQuery = '';
   var selectedRejectId = '';
   var inputMode = 'graphic';
   var indexType = 'draft';
@@ -505,11 +522,12 @@
     var body = byId('manage-list');
     clear(body);
     if (!canAccessStaff(role, currentAssignee)) return;
-    var records = state.documents.filter(function (item) {
+    var hasPending = state.documents.some(function (item) {
       return item.status === STATUS.RECEIVED;
     });
+    var records = filterAndSortPendingCases(state.documents, manageSearchQuery);
     if (!records.length) {
-      body.appendChild(el('p', 'empty', '目前沒有待處理案件。'));
+      body.appendChild(el('p', 'empty', hasPending && manageSearchQuery.trim() ? '查無符合的文號。' : '目前沒有待處理案件。'));
       return;
     }
     records.forEach(function (record) {
@@ -669,6 +687,11 @@
     role = role === 'general' ? 'staff' : 'general';
     renderAll();
     notify('已切換為' + byId('role-label').textContent + '。');
+  });
+
+  byId('manage-search').addEventListener('input', function () {
+    manageSearchQuery = byId('manage-search').value;
+    renderManage();
   });
 
   byId('manual-receive-form').addEventListener('submit', async function (event) {
