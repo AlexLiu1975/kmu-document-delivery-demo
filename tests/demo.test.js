@@ -97,8 +97,8 @@ test('allows a rejected document to be received again', () => {
   );
 });
 
-test('uses a one-minute employee session timeout', () => {
-  assert.equal(app.SESSION_TIMEOUT_MS, 60_000);
+test('uses a ten-minute employee session timeout', () => {
+  assert.equal(app.SESSION_TIMEOUT_MS, 600_000);
   assert.equal(app.formatCountdown(60), '01:00');
   assert.equal(app.formatCountdown(9), '00:09');
   assert.equal(app.formatCountdown(0), '00:00');
@@ -119,7 +119,7 @@ test('shows the five history fields and rejection employee number', () => {
   assert.match(source, /動作/);
   assert.match(source, /退文原因/);
   assert.match(source, /操作帳號/);
-  assert.match(source, /最近退文人員職號/);
+  assert.match(source, /退文人員職號/);
 });
 
 test('groups document events into one complete workflow row', () => {
