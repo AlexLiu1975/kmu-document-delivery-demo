@@ -104,12 +104,15 @@ test('uses a ten-minute employee session timeout', () => {
   assert.equal(app.formatCountdown(0), '00:00');
 });
 
-test('does not carry a logged-in employee session into staff access', () => {
+test('restricts staff access to the whitelisted employee numbers only', () => {
   assert.equal(app.canSwitchRole(''), true);
   assert.equal(app.canSwitchRole('1115034'), false);
   assert.equal(app.canAccessStaff('general', '1115034'), false);
   assert.equal(app.canAccessStaff('staff', ''), false);
   assert.equal(app.canAccessStaff('staff', '1115034'), true);
+  assert.equal(app.canAccessStaff('staff', '1107054'), true);
+  assert.equal(app.canAccessStaff('staff', '9999999'), false);
+  assert.equal(app.canAccessStaff('staff', '7654321'), false);
 });
 
 test('shows the five history fields and rejection employee number', () => {
