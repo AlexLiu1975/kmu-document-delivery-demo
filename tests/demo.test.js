@@ -122,6 +122,22 @@ test('shows the five history fields and rejection employee number', () => {
   assert.match(source, /退文人員職號/);
 });
 
+test('filters pending cases by document number and sorts by update time', () => {
+  const documents = [
+    { documentNumber: '1151100002', status: '已收文', updatedAt: '2026-07-26 09:00:00' },
+    { documentNumber: '1151100001', status: '已收文', updatedAt: '2026-07-26 08:00:00' },
+    { documentNumber: '1151100003', status: '已歸檔', updatedAt: '2026-07-26 07:00:00' }
+  ];
+  const sorted = app.filterAndSortPendingCases(documents, '');
+  assert.deepEqual(
+    sorted.map((item) => item.documentNumber),
+    ['1151100001', '1151100002']
+  );
+  const filtered = app.filterAndSortPendingCases(documents, '0002');
+  assert.deepEqual(filtered.map((item) => item.documentNumber), ['1151100002']);
+  assert.deepEqual(app.filterAndSortPendingCases(documents, '9999'), []);
+});
+
 test('groups document events into one complete workflow row', () => {
   const grouped = app.groupHistoryByDocument([
     {
@@ -181,6 +197,7 @@ test('uses Firebase as the only shared data source', () => {
   assert.match(html, /id="input-mode-manual"/);
   assert.match(html, /id="document-matrix"/);
   assert.match(html, /id="manual-receive-form"/);
+  assert.match(html, /id="manage-search"/);
   assert.match(html, /<option>缺少發文日期<\/option>/);
   assert.match(html, /<option>缺少已用印信章<\/option>/);
   assert.match(html, /<option>缺少監印章<\/option>/);
