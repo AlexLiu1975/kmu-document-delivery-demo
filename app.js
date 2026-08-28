@@ -9,6 +9,7 @@
   var SESSION_TIMEOUT_MS = 600000;
   var REASONS = ['缺少發文日期', '缺少已用印信章', '缺少監印章', '缺少校對章', '其它'];
   var STATUS = { DELIVERED: '已送達', RECEIVED: '已收文', REJECTED: '已退文', ARCHIVED: '已歸檔' };
+  var STAFF_EMPLOYEE_NUMBERS = ['1107054', '1115034'];
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -62,7 +63,7 @@
   }
 
   function canAccessStaff(roleName, employeeNumber) {
-    return roleName === 'staff' && /^\d{7}$/.test(String(employeeNumber || '').trim());
+    return roleName === 'staff' && STAFF_EMPLOYEE_NUMBERS.indexOf(String(employeeNumber || '').trim()) >= 0;
   }
 
   function nextStatus(fromStatus, action) {
@@ -500,8 +501,11 @@
     currentAssignee = employeeNumber;
     startFirebaseSubscription();
     resetSessionTimer();
+    var deniedStaffAccess = role === 'staff' && !canAccessStaff(role, currentAssignee);
+    if (deniedStaffAccess) role = 'general';
     renderAll();
     notify('職號 ' + currentAssignee + ' 已登入 Firebase 測試資料。');
+    if (deniedStaffAccess) notify('此職號沒有事務組權限，已切換為一般人員。', true);
   }
 
   function showReceivedResult(number) {
