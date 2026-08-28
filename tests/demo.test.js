@@ -176,7 +176,7 @@ test('uses Firebase as the only shared data source', () => {
   assert.match(html, /id="session-countdown"/);
   assert.match(html, /✓ 已登入/);
   assert.match(html, /輸入職號/);
-  assert.match(html, /placeholder="例如：1115034"/);
+  assert.match(html, /placeholder="輸入職號"/);
   assert.match(html, /id="input-mode-graphic"/);
   assert.match(html, /id="input-mode-manual"/);
   assert.match(html, /id="document-matrix"/);
