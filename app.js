@@ -35,13 +35,13 @@
   }
 
   function buildDocumentNumber(year, typeCode, serial) {
-    return String(year).padStart(3, '0') + String(typeCode).padStart(3, '0') +
+    return String(year).padStart(3, '0') + String(typeCode).padStart(2, '0') +
       String(serial).padStart(5, '0');
   }
 
   function normalizeIndexDocumentNumber(value) {
     var text = String(value == null ? '' : value).trim();
-    if (!/^\d{11}$/.test(text)) throw new Error('請輸入完整 11 碼文號。');
+    if (!/^\d{10}$/.test(text)) throw new Error('請輸入完整 10 碼文號。');
     return text;
   }
 
@@ -392,7 +392,7 @@
     clear(body);
     var year = byId('index-year').value;
     var page = clampIndexPage(byId('index-page').value);
-    var typeCode = indexType === 'draft' ? '110' : '000';
+    var typeCode = indexType === 'draft' ? '11' : '00';
     var start = page * 100;
     var end = start + 99;
     byId('index-page').value = page;

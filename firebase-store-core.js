@@ -58,8 +58,8 @@
     var document = current ? Object.assign({}, current) : {
       documentNumber: documentNumber,
       year: documentNumber.slice(0, 3),
-      typeCode: documentNumber.slice(3, 6),
-      serial: documentNumber.slice(6),
+      typeCode: documentNumber.slice(3, 5),
+      serial: documentNumber.slice(5),
       createdAt: timestamp,
       latestRejectionReason: '',
       latestRejectionActor: '',
