@@ -786,6 +786,7 @@
 
   byId('reject-form').addEventListener('submit', async function (event) {
     event.preventDefault();
+    var form = event.currentTarget;
     try {
       if (!canAccessStaff(role, currentAssignee)) {
         throw new Error('請先以事務組身分登入。');
@@ -793,7 +794,7 @@
       var reason = validateRejectionReason(byId('reason').value, byId('other').value);
       await firebaseStore.reject(selectedRejectId, currentAssignee, reason);
       byId('reject-dialog').close();
-      event.currentTarget.reset();
+      form.reset();
       byId('other-wrap').hidden = true;
       renderAll();
       notify('退文完成。');
