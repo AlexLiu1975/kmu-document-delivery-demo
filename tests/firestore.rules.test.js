@@ -25,9 +25,9 @@ let environment;
 
 function documentData(overrides = {}) {
   return {
-    documentNumber: '11511000016',
+    documentNumber: '1151100016',
     year: '115',
-    typeCode: '110',
+    typeCode: '11',
     serial: '00016',
     status: '已收文',
     assignee: '1115034',
@@ -42,7 +42,7 @@ function documentData(overrides = {}) {
 
 function eventData(uid, overrides = {}) {
   return {
-    documentNumber: '11511000016',
+    documentNumber: '1151100016',
     action: '承辦人收文',
     oldStatus: '',
     newStatus: '已收文',
@@ -73,27 +73,27 @@ test.beforeEach(async () => {
 
 test('denies unauthenticated document reads and writes', async () => {
   const db = environment.unauthenticatedContext().firestore();
-  await assertFails(getDoc(doc(db, 'documents/11511000016')));
-  await assertFails(setDoc(doc(db, 'documents/11511000016'), documentData()));
+  await assertFails(getDoc(doc(db, 'documents/1151100016')));
+  await assertFails(setDoc(doc(db, 'documents/1151100016'), documentData()));
 });
 
 test('allows an authenticated user to create a valid received document', async () => {
   const db = environment.authenticatedContext('uid-a').firestore();
-  await assertSucceeds(setDoc(doc(db, 'documents/11511000016'), documentData()));
+  await assertSucceeds(setDoc(doc(db, 'documents/1151100016'), documentData()));
 });
 
 test('denies malformed employee numbers and document numbers', async () => {
   const db = environment.authenticatedContext('uid-a').firestore();
   await assertFails(setDoc(doc(db, 'documents/not-a-number'), documentData()));
   await assertFails(setDoc(
-    doc(db, 'documents/11511000016'),
+    doc(db, 'documents/1151100016'),
     documentData({ assignee: '123' })
   ));
 });
 
 test('allows the approved document status transitions', async () => {
   const db = environment.authenticatedContext('uid-a').firestore();
-  const ref = doc(db, 'documents/11511000016');
+  const ref = doc(db, 'documents/1151100016');
   await assertSucceeds(setDoc(ref, documentData()));
   await assertSucceeds(updateDoc(ref, {
     status: '已退文',
@@ -117,9 +117,9 @@ test('allows the approved document status transitions', async () => {
 
 test('denies updates to archived documents and document deletion', async () => {
   const db = environment.authenticatedContext('uid-a').firestore();
-  const ref = doc(db, 'documents/11511000016');
+  const ref = doc(db, 'documents/1151100016');
   await environment.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), 'documents/11511000016'), documentData({
+    await setDoc(doc(context.firestore(), 'documents/1151100016'), documentData({
       status: '已歸檔',
       revision: 4
     }));
@@ -134,12 +134,12 @@ test('denies updates to archived documents and document deletion', async () => {
 
 test('allows event creation but denies event update and delete', async () => {
   const db = environment.authenticatedContext('uid-a').firestore();
-  const ref = doc(db, 'documents/11511000016/events/event-1');
+  const ref = doc(db, 'documents/1151100016/events/event-1');
   await assertSucceeds(setDoc(ref, eventData('uid-a')));
   await assertFails(updateDoc(ref, { reason: '竄改原因' }));
   await assertFails(deleteDoc(ref));
   await assertFails(setDoc(
-    doc(db, 'documents/11511000016/events/event-2'),
+    doc(db, 'documents/1151100016/events/event-2'),
     eventData('different-uid')
   ));
 });
@@ -147,7 +147,7 @@ test('allows event creation but denies event update and delete', async () => {
 test('allows authenticated collection-group reads of operation events', async () => {
   await environment.withSecurityRulesDisabled(async (context) => {
     await setDoc(
-      doc(context.firestore(), 'documents/11511000016/events/event-1'),
+      doc(context.firestore(), 'documents/1151100016/events/event-1'),
       eventData('uid-a')
     );
   });

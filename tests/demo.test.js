@@ -32,7 +32,7 @@ test('validates the fixed rejection reasons', () => {
 });
 
 test('allows staff to reject a received document with a fixed reason', () => {
-  let state = app.registerReceived(app.emptyState(), '11511000500', '1115034');
+  let state = app.registerReceived(app.emptyState(), '1151100500', '1115034');
   const id = state.documents[0].id;
   state = app.manage(state, id, 'REJECT', '缺少發文日期', '', '7654321');
   assert.equal(state.documents[0].status, '已退文');
@@ -64,30 +64,30 @@ test('prevents duplicate delivery unless the document was rejected', () => {
   assert.throws(() => app.deliver(state, '測試字第2號', '一般測試人員'));
 });
 
-test('builds eleven-digit index document numbers', () => {
-  assert.equal(app.buildDocumentNumber('115', '110', 500), '11511000500');
-  assert.equal(app.buildDocumentNumber('115', '000', 599), '11500000599');
+test('builds ten-digit index document numbers', () => {
+  assert.equal(app.buildDocumentNumber('115', '11', 500), '1151100500');
+  assert.equal(app.buildDocumentNumber('115', '00', 599), '1150000599');
 });
 
 test('registers received documents with a seven-digit employee number', () => {
   let state = app.emptyState();
-  state = app.registerReceived(state, '11511000500', '1115034');
+  state = app.registerReceived(state, '1151100500', '1115034');
   assert.equal(state.documents[0].status, '已收文');
   assert.equal(state.documents[0].assignee, '1115034');
   assert.equal(state.history[0].action, '承辦人收文');
   assert.equal(state.history[0].actor, '1115034');
-  assert.throws(() => app.registerReceived(state, '11511000500', '1115034'));
-  assert.throws(() => app.registerReceived(state, '11511000501', ''));
-  assert.throws(() => app.registerReceived(state, '11511000501', '王小明'));
-  assert.throws(() => app.registerReceived(state, '11511000501', '123456'));
-  assert.throws(() => app.registerReceived(state, '1151100501', '1115034'));
+  assert.throws(() => app.registerReceived(state, '1151100500', '1115034'));
+  assert.throws(() => app.registerReceived(state, '1151100501', ''));
+  assert.throws(() => app.registerReceived(state, '1151100501', '王小明'));
+  assert.throws(() => app.registerReceived(state, '1151100501', '123456'));
+  assert.throws(() => app.registerReceived(state, '115110501', '1115034'));
 });
 
 test('allows a rejected document to be received again', () => {
-  let state = app.registerReceived(app.emptyState(), '11511000016', '1115034');
+  let state = app.registerReceived(app.emptyState(), '1151100016', '1115034');
   const id = state.documents[0].id;
   state = app.manage(state, id, 'REJECT', '缺少發文日期', '', '7654321');
-  state = app.registerReceived(state, '11511000016', '1115034');
+  state = app.registerReceived(state, '1151100016', '1115034');
 
   assert.equal(state.documents[0].status, '已收文');
   assert.equal(state.documents[0].assignee, '1115034');
