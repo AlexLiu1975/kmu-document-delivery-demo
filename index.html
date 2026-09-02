@@ -87,7 +87,7 @@
               <span class="control-label">頁次</span>
               <div class="index-pager">
                 <button id="index-prev" class="button secondary" type="button" aria-label="上一頁">←</button>
-                <input id="index-page" type="number" min="0" max="99" value="0" aria-label="頁碼">
+                <input id="index-page" type="number" min="0" max="999" value="0" aria-label="頁碼">
                 <button id="index-next" class="button secondary" type="button" aria-label="下一頁">→</button>
               </div>
             </div>
@@ -101,9 +101,9 @@
 
         <section id="manual-receive" class="receive-method" hidden>
           <form id="manual-receive-form">
-            <label for="manual-document-number">完整10碼文號</label>
-            <input id="manual-document-number" inputmode="numeric" maxlength="10"
-              pattern="[0-9]{10}" placeholder="例如：1151100500" required>
+            <label for="manual-document-number">完整11碼文號</label>
+            <input id="manual-document-number" inputmode="numeric" maxlength="11"
+              pattern="[0-9]{11}" placeholder="例如：11511000500" required>
             <button class="button primary" type="submit">登記為事務組簽收</button>
           </form>
         </section>
@@ -128,8 +128,8 @@
           <h2>查詢公文進度</h2>
           <p>請輸入完整測試文號。</p>
           <label for="query-number">公文文號</label>
-          <input id="query-number" inputmode="numeric" maxlength="10" pattern="[0-9]{10}"
-            required placeholder="例如：1151100016">
+          <input id="query-number" inputmode="numeric" maxlength="11" pattern="[0-9]{11}"
+            required placeholder="例如：11511000016">
           <button class="button primary" type="submit">查詢進度</button>
         </form>
         <div class="card">

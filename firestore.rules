@@ -7,7 +7,7 @@ service cloud.firestore {
     }
 
     function validDocumentNumber(value) {
-      return value is string && value.matches('^[0-9]{10}$');
+      return value is string && value.matches('^[0-9]{11}$');
     }
 
     function validEmployeeNumber(value) {
@@ -39,7 +39,7 @@ service cloud.firestore {
         && data.typeCode is string
         && data.typeCode.matches('^[0-9]{3}$')
         && data.serial is string
-        && data.serial.matches('^[0-9]{4}$')
+        && data.serial.matches('^[0-9]{5}$')
         && data.documentNumber == data.year + data.typeCode + data.serial
         && validStatus(data.status)
         && validEmployeeNumber(data.assignee)

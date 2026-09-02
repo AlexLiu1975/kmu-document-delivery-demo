@@ -36,12 +36,12 @@
 
   function buildDocumentNumber(year, typeCode, serial) {
     return String(year).padStart(3, '0') + String(typeCode).padStart(3, '0') +
-      String(serial).padStart(4, '0');
+      String(serial).padStart(5, '0');
   }
 
   function normalizeIndexDocumentNumber(value) {
     var text = String(value == null ? '' : value).trim();
-    if (!/^\d{10}$/.test(text)) throw new Error('請輸入完整 10 碼文號。');
+    if (!/^\d{11}$/.test(text)) throw new Error('請輸入完整 11 碼文號。');
     return text;
   }
 
@@ -371,7 +371,7 @@
   function clampIndexPage(value) {
     var parsed = parseInt(value, 10);
     if (isNaN(parsed)) return 0;
-    return Math.max(0, Math.min(99, parsed));
+    return Math.max(0, Math.min(999, parsed));
   }
 
   function findDocument(number) {
@@ -397,7 +397,7 @@
     var end = start + 99;
     byId('index-page').value = page;
     byId('index-prev').disabled = page === 0;
-    byId('index-next').disabled = page === 99;
+    byId('index-next').disabled = page === 999;
     byId('index-range').textContent =
       buildDocumentNumber(year, typeCode, start) + '–' + buildDocumentNumber(year, typeCode, end);
     byId('index-draft').classList.toggle('active', indexType === 'draft');
