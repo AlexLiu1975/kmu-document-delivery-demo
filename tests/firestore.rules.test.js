@@ -115,6 +115,19 @@ test('allows the approved document status transitions', async () => {
   }));
 });
 
+test('still allows updates to legacy documents with the old 3-digit type code and 4-digit serial', async () => {
+  const db = environment.authenticatedContext('uid-a').firestore();
+  const ref = doc(db, 'documents/1151100016');
+  await assertSucceeds(setDoc(ref, documentData({ typeCode: '110', serial: '0016' })));
+  await assertSucceeds(updateDoc(ref, {
+    status: '已退文',
+    latestRejectionReason: '缺少發文日期',
+    latestRejectionActor: '1115034',
+    updatedAt: Timestamp.now(),
+    revision: 2
+  }));
+});
+
 test('denies updates to archived documents and document deletion', async () => {
   const db = environment.authenticatedContext('uid-a').firestore();
   const ref = doc(db, 'documents/1151100016');
