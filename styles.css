@@ -43,7 +43,7 @@ main { padding: 24px 0 48px; }
 .tab.active { color: white; background: var(--navy); }
 .panel { display: none; margin-top: 18px; }
 .panel.active { display: block; }
-.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
 .card { padding: clamp(21px, 4vw, 30px); border: 1px solid var(--line); border-radius: 16px; background: var(--paper); box-shadow: var(--shadow); }
 .eyebrow { color: var(--teal); font-size: .78rem; font-weight: 900; letter-spacing: .08em; }
 h2 { margin: 4px 0 5px; color: var(--navy-dark); }
