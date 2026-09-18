@@ -22,24 +22,32 @@ service cloud.firestore {
       return value == '' || validEmployeeNumber(value);
     }
 
+    function statusCode(value) {
+      return value == '已收文' || value == '事務組簽收' ? 'R'
+        : value == '已退文' ? 'B'
+        : value == '已歸檔' ? 'A'
+        : value == '未收文' || value == '已送達' ? 'P' : value;
+    }
+
     function validStatus(value) {
-      return value in ['已收文', '已退文', '已歸檔'];
+      return statusCode(value) in ['P', 'R', 'B', 'A'];
     }
 
     function validDocument(data, documentNumber) {
       return data.keys().hasOnly([
           'documentNumber', 'year', 'typeCode', 'serial', 'status',
           'assignee', 'latestRejectionReason', 'latestRejectionActor',
-          'createdAt', 'updatedAt', 'revision'
+          'createdAt', 'updatedAt', 'revision', 'returnCount',
+          'lastReturnDate', 'receivedAt', 'archivedAt'
         ])
         && validDocumentNumber(documentNumber)
         && data.documentNumber == documentNumber
         && data.year is string
         && data.year.matches('^[0-9]{3}$')
         && data.typeCode is string
-        && data.typeCode.matches('^[0-9]{2}$')
+        && data.typeCode.matches('^[0-9]{2,3}$')
         && data.serial is string
-        && data.serial.matches('^[0-9]{5}$')
+        && data.serial.matches('^[0-9]{4,5}$')
         && data.documentNumber == data.year + data.typeCode + data.serial
         && validStatus(data.status)
         && validEmployeeNumber(data.assignee)
@@ -49,13 +57,18 @@ service cloud.firestore {
         && data.createdAt is timestamp
         && data.updatedAt is timestamp
         && data.revision is int
-        && data.revision >= 1;
+        && data.revision >= 1
+        && (!('returnCount' in data) || (data.returnCount is int && data.returnCount >= 0))
+        && (!('lastReturnDate' in data) || data.lastReturnDate is timestamp)
+        && (!('receivedAt' in data) || data.receivedAt is timestamp)
+        && (!('archivedAt' in data) || data.archivedAt is timestamp);
     }
 
     function validTransition(oldStatus, newStatus) {
-      return (oldStatus == '已收文' && newStatus == '已退文')
-        || (oldStatus == '已退文' && newStatus == '已收文')
-        || (oldStatus == '已收文' && newStatus == '已歸檔');
+      return (statusCode(oldStatus) == 'P' && statusCode(newStatus) == 'R')
+        || (statusCode(oldStatus) == 'R' && statusCode(newStatus) == 'B')
+        || (statusCode(oldStatus) == 'B' && statusCode(newStatus) == 'R')
+        || (statusCode(oldStatus) == 'R' && statusCode(newStatus) == 'A');
     }
 
     function immutableDocumentFields() {
@@ -80,21 +93,21 @@ service cloud.firestore {
         && data.reason.size() <= 200
         && (
           (data.action == '承辦人收文'
-            && data.oldStatus == ''
-            && data.newStatus == '已收文'
+            && (data.oldStatus == '' || statusCode(data.oldStatus) == 'P')
+            && statusCode(data.newStatus) == 'R'
             && data.reason == '')
           || (data.action == '退文'
-            && data.oldStatus == '已收文'
-            && data.newStatus == '已退文'
+            && statusCode(data.oldStatus) == 'R'
+            && statusCode(data.newStatus) == 'B'
             && data.reason.size() > 0
             && isStaffEmployee(data.actor))
           || (data.action == '承辦人重新收文'
-            && data.oldStatus == '已退文'
-            && data.newStatus == '已收文'
+            && statusCode(data.oldStatus) == 'B'
+            && statusCode(data.newStatus) == 'R'
             && data.reason == '')
           || (data.action == '歸檔'
-            && data.oldStatus == '已收文'
-            && data.newStatus == '已歸檔'
+            && statusCode(data.oldStatus) == 'R'
+            && statusCode(data.newStatus) == 'A'
             && data.reason == ''
             && isStaffEmployee(data.actor))
         );
@@ -104,7 +117,7 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if signedIn()
         && validDocument(request.resource.data, documentNumber)
-        && request.resource.data.status == '已收文'
+        && statusCode(request.resource.data.status) in ['P', 'R']
         && request.resource.data.revision == 1
         && request.resource.data.latestRejectionReason == ''
         && request.resource.data.latestRejectionActor == '';

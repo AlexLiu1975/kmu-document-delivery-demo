@@ -167,3 +167,39 @@ test('allows authenticated collection-group reads of operation events', async ()
   const db = environment.authenticatedContext('uid-a').firestore();
   await assertSucceeds(getDocs(query(collectionGroup(db, 'events'))));
 });
+
+test('canonical P/R/B/A lifecycle preserves return metadata through receive and archive', async () => {
+  const db = environment.authenticatedContext('uid-a').firestore();
+  const ref = doc(db, 'documents/1151100016');
+  const core = require('../firebase-store-core');
+  const assert = require('node:assert/strict');
+  await assertSucceeds(setDoc(ref, documentData({ status: 'P', typeCode: '110', serial: '0016', returnCount: 0 })));
+  for (const operation of ['RECEIVE', 'REJECT', 'RECEIVE', 'ARCHIVE']) {
+    const current = (await getDoc(ref)).data();
+    const mutation = core.buildMutation(current, '1151100016', '1115034', operation, operation === 'REJECT' ? '缺少監印章' : '', 'uid-a', Timestamp.now());
+    await assertSucceeds(setDoc(ref, mutation.document));
+    await assertSucceeds(setDoc(doc(ref, 'events', operation + current.revision), mutation.event));
+  }
+  const archived = (await getDoc(ref)).data();
+  assert.equal(archived.status, 'A');
+  assert.equal(archived.returnCount, 1);
+  assert.equal(archived.latestRejectionReason, '缺少監印章');
+  await assertFails(updateDoc(ref, { status: 'B', revision: archived.revision + 1 }));
+});
+
+test('legacy Chinese document can transition to canonical B while preserving immutable numbering', async () => {
+  const db = environment.authenticatedContext('uid-a').firestore();
+  const ref = doc(db, 'documents/1151100016');
+  await assertSucceeds(setDoc(ref, documentData()));
+  const core = require('../firebase-store-core');
+  const mutation = core.buildMutation((await getDoc(ref)).data(), '1151100016', '1115034', 'REJECT', '缺少監印章', 'uid-a', Timestamp.now());
+  await assertSucceeds(setDoc(ref, mutation.document));
+});
+
+test('P cannot be archived and unknown status codes are denied', async () => {
+  const db = environment.authenticatedContext('uid-a').firestore();
+  const ref = doc(db, 'documents/1151100016');
+  await assertFails(setDoc(ref, documentData({status:'X'})));
+  await assertSucceeds(setDoc(ref, documentData({status:'P'})));
+  await assertFails(updateDoc(ref,{status:'A',revision:2}));
+});

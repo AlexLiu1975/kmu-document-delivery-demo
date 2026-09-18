@@ -5,6 +5,7 @@
 })(typeof window !== 'undefined' ? window : null, function () {
   'use strict';
 
+  var statusModel = typeof module === 'object' && module.exports ? require('./status.js') : window.DocumentStatus;
   function validateEmployeeNumber(value) {
     var text = String(value == null ? '' : value).trim();
     if (!/^\d{7}$/.test(text)) throw new Error('請輸入7碼職號，例如：1115034。');
@@ -18,33 +19,26 @@
   }
 
   function actionForTransition(oldStatus, newStatus) {
-    var key = String(oldStatus || '') + '|' + String(newStatus || '');
+    var key = statusModel.normalize(oldStatus) + '|' + statusModel.normalize(newStatus);
     var actions = {
-      '|已收文': '承辦人收文',
-      '已收文|已退文': '退文',
-      '已退文|已收文': '承辦人重新收文',
-      '已收文|已歸檔': '歸檔'
+      'P|R': '承辦人收文',
+      '|R': '承辦人收文',
+      'R|B': '退文',
+      'B|R': '承辦人重新收文',
+      'R|A': '歸檔'
     };
     if (!actions[key]) throw new Error('目前狀態不允許執行此操作。');
     return actions[key];
   }
 
-  function targetStatus(current, operation) {
-    var status = current ? current.status : '';
-    if (operation === 'RECEIVE' && (!current || status === '已退文')) return '已收文';
-    if (operation === 'REJECT' && status === '已收文') return '已退文';
-    if (operation === 'ARCHIVE' && status === '已收文') return '已歸檔';
-    throw new Error(current
-      ? '此文號目前狀態為「' + status + '」，不允許執行此操作。'
-      : '此文號尚未收文。');
-  }
+  function targetStatus(current, operation) { return statusModel.next(current ? current.status : '', operation); }
 
   function buildMutation(current, number, actor, operation, reason, authUid, timestamp) {
     var documentNumber = validateDocumentNumber(number);
     var employeeNumber = validateEmployeeNumber(actor);
     var uid = String(authUid || '').trim();
     if (!uid) throw new Error('Firebase 登入狀態已失效，請重新登入。');
-    var oldStatus = current ? String(current.status || '') : '';
+    var oldStatus = current ? statusModel.normalize(current.status) : '';
     var newStatus = targetStatus(current, operation);
     var action = actionForTransition(oldStatus, newStatus);
     var rejectionReason = String(reason || '').trim();
@@ -58,8 +52,8 @@
     var document = current ? Object.assign({}, current) : {
       documentNumber: documentNumber,
       year: documentNumber.slice(0, 3),
-      typeCode: documentNumber.slice(3, 5),
-      serial: documentNumber.slice(5),
+      typeCode: documentNumber.slice(3, 6),
+      serial: documentNumber.slice(6),
       createdAt: timestamp,
       latestRejectionReason: '',
       latestRejectionActor: '',
@@ -68,8 +62,12 @@
     document.status = newStatus;
     document.updatedAt = timestamp;
     document.revision = Number(document.revision || 0) + 1;
-    if (operation === 'RECEIVE') document.assignee = employeeNumber;
+    if (operation === 'RECEIVE') { document.assignee = employeeNumber; document.receivedAt = timestamp; }
+    if (operation === 'ARCHIVE') document.archivedAt = timestamp;
+    document.returnCount = Number(document.returnCount || 0);
     if (operation === 'REJECT') {
+      document.returnCount += 1;
+      document.lastReturnDate = timestamp;
       document.latestRejectionReason = rejectionReason;
       document.latestRejectionActor = employeeNumber;
     }

@@ -5,10 +5,11 @@
 })(typeof window !== 'undefined' ? window : null, function () {
   'use strict';
 
+  var statusModel = typeof module === 'object' && module.exports ? require('./status.js') : window.DocumentStatus;
   var STORAGE_KEY = 'kmu-document-delivery-demo-v1';
   var SESSION_TIMEOUT_MS = 600000;
   var REASONS = ['缺少發文日期', '缺少已用印信章', '缺少監印章', '缺少校對章', '其它'];
-  var STATUS = { DELIVERED: '已送達', RECEIVED: '已收文', REJECTED: '已退文', ARCHIVED: '已歸檔' };
+  var STATUS = { DELIVERED: 'P', RECEIVED: 'R', REJECTED: 'B', ARCHIVED: 'A' };
   var STAFF_EMPLOYEE_NUMBERS = ['1107054', '1115034'];
 
   function clone(value) {
@@ -35,8 +36,8 @@
   }
 
   function buildDocumentNumber(year, typeCode, serial) {
-    return String(year).padStart(3, '0') + String(typeCode).padStart(2, '0') +
-      String(serial).padStart(5, '0');
+    return String(year).padStart(3, '0') + String(typeCode).padStart(3, '0') +
+      String(serial).padStart(4, '0');
   }
 
   function normalizeIndexDocumentNumber(value) {
@@ -66,19 +67,10 @@
     return roleName === 'staff' && STAFF_EMPLOYEE_NUMBERS.indexOf(String(employeeNumber || '').trim()) >= 0;
   }
 
-  function nextStatus(fromStatus, action) {
-    var transitions = {};
-    transitions['|DELIVER'] = STATUS.DELIVERED;
-    transitions[STATUS.REJECTED + '|REDELIVER'] = STATUS.DELIVERED;
-    transitions[STATUS.DELIVERED + '|RECEIVE'] = STATUS.RECEIVED;
-    transitions[STATUS.REJECTED + '|RECEIVE'] = STATUS.RECEIVED;
-    transitions[STATUS.DELIVERED + '|REJECT'] = STATUS.REJECTED;
-    transitions[STATUS.RECEIVED + '|REJECT'] = STATUS.REJECTED;
-    transitions[STATUS.RECEIVED + '|ARCHIVE'] = STATUS.ARCHIVED;
-    var result = transitions[String(fromStatus || '') + '|' + action];
-    if (!result) throw new Error('目前狀態不允許執行此操作。');
-    return result;
-  }
+  function nextStatus(fromStatus, action) { return statusModel.next(fromStatus, action); }
+
+  function statusLabel(status) { return statusModel.label(status); }
+  function statusClass(status) { return statusModel.className(status); }
 
   function validateRejectionReason(category, detail) {
     var selected = String(category || '').trim();
@@ -119,10 +111,10 @@
       addHistory(state, document, '首次送達', '', actor);
       return state;
     }
-    if (document.status !== STATUS.REJECTED) {
+    if (statusModel.normalize(document.status) !== STATUS.REJECTED) {
       throw new Error('此文號已登錄，目前狀態為「' + document.status + '」。');
     }
-    var oldStatus = document.status;
+    var oldStatus = statusModel.normalize(document.status);
     document.status = nextStatus(oldStatus, 'REDELIVER');
     document.lastDeliveredAt = time;
     document.updatedAt = time;
@@ -136,23 +128,24 @@
     var handler = normalizeAssignee(assignee);
     var document = state.documents.find(function (item) { return item.index === normalized; });
     var time = nowText();
-    if (document && document.status !== STATUS.DELIVERED && document.status !== STATUS.REJECTED) {
+    if (document && statusModel.normalize(document.status) !== STATUS.DELIVERED && statusModel.normalize(document.status) !== STATUS.REJECTED) {
       throw new Error('此文號已登錄，目前狀態為「' + document.status + '」。');
     }
     if (!document) {
       document = {
         id: newId('DOC'), documentNumber: normalized, index: normalized,
         status: STATUS.RECEIVED, firstDeliveredAt: time, lastDeliveredAt: time,
-        updatedAt: time, latestRejectionReason: '', assignee: handler
+        updatedAt: time, receivedAt: time, returnCount: 0, latestRejectionReason: '', assignee: handler
       };
       state.documents.push(document);
       addHistory(state, document, '承辦人收文', '', handler);
       return state;
     }
-    var oldStatus = document.status;
+    var oldStatus = statusModel.normalize(document.status);
     document.status = nextStatus(oldStatus, 'RECEIVE');
     document.updatedAt = time;
     document.assignee = handler;
+    document.receivedAt = time;
     addHistory(
       state,
       document,
@@ -167,11 +160,15 @@
     var state = clone(inputState);
     var document = state.documents.find(function (item) { return item.id === documentId; });
     if (!document) throw new Error('查無此案件。');
-    var oldStatus = document.status;
+    var oldStatus = statusModel.normalize(document.status);
     var reason = action === 'REJECT' ? validateRejectionReason(category, detail) : '';
     document.status = nextStatus(oldStatus, action);
     document.updatedAt = nowText();
+    if (action === 'RECEIVE') document.receivedAt = document.updatedAt;
+    if (action === 'ARCHIVE') document.archivedAt = document.updatedAt;
     if (reason) {
+      document.returnCount = Number(document.returnCount || 0) + 1;
+      document.lastReturnDate = document.updatedAt;
       document.latestRejectionReason = reason;
       document.latestRejectionActor = normalizeAssignee(actor);
     }
@@ -184,6 +181,7 @@
     var state = emptyState();
     state = deliver(state, '測試秘字第115000001號', '一般測試人員');
     state = deliver(state, '測試秘字第115000002號', '一般測試人員');
+    state = manage(state, state.documents[1].id, 'RECEIVE', '', '', '7654321');
     state = manage(state, state.documents[1].id, 'REJECT', '缺少校對章', '', '7654321');
     return state;
   }
@@ -191,7 +189,7 @@
   function filterAndSortPendingCases(documents, query) {
     var normalizedQuery = String(query || '').trim();
     var records = (documents || []).filter(function (item) {
-      return item.status === STATUS.RECEIVED;
+      return statusModel.normalize(item.status) === STATUS.RECEIVED;
     });
     if (normalizedQuery) {
       records = records.filter(function (item) {
@@ -249,6 +247,8 @@
     REASONS: REASONS,
     STATUS: STATUS,
     emptyState: emptyState,
+    statusLabel: statusLabel,
+    statusClass: statusClass,
     normalizeDocumentNumber: normalizeDocumentNumber,
     buildDocumentNumber: buildDocumentNumber,
     normalizeIndexDocumentNumber: normalizeIndexDocumentNumber,
@@ -289,10 +289,7 @@
     return node;
   }
 
-  function statusLabel(status) {
-    if (status === STATUS.RECEIVED) return '事務組簽收';
-    return status;
-  }
+
 
   function clear(node) {
     while (node.firstChild) node.removeChild(node.firstChild);
@@ -330,7 +327,7 @@
   }
 
   function recordCard(record) {
-    var headers = ['文號', '目前狀態', '登錄時間', '登錄職號', '最後更新', '最近退文原因', '退文人員職號'];
+    var headers = ['文號', '目前狀態', '登錄時間', '登錄職號', '最後更新', '最近退文原因', '退文人員職號', '退文次數', '最近退文日期', '收文日期', '歸檔日期'];
     var values = [
       record.documentNumber,
       statusLabel(record.status),
@@ -338,7 +335,8 @@
       record.assignee || '—',
       record.updatedAt || '—',
       record.latestRejectionReason || '—',
-      record.latestRejectionActor || '—'
+      record.latestRejectionActor || '—',
+      record.returnCount || 0, record.lastReturnDate || '—', record.receivedAt || '—', record.archivedAt || '—'
     ];
     var wrap = el('div', 'history-list');
     var table = el('table', 'history-table');
@@ -357,7 +355,7 @@
       if (index === 1) {
         cell.textContent = '';
         var badge = el('strong', 'badge', value);
-        badge.dataset.status = record.status;
+        badge.dataset.status = statusModel.normalize(record.status);
         cell.appendChild(badge);
       }
       row.appendChild(cell);
@@ -365,13 +363,19 @@
     body.appendChild(row);
     table.appendChild(body);
     wrap.appendChild(table);
+    if (currentAssignee && ['P', 'B'].indexOf(statusModel.normalize(record.status)) >= 0) {
+      wrap.appendChild(actionButton('收文', 'primary', async function () {
+        try { await runRegisterReceived(record.documentNumber); }
+        catch (error) { notify(firebaseErrorMessage(error), true); }
+      }));
+    }
     return wrap;
   }
 
   function clampIndexPage(value) {
     var parsed = parseInt(value, 10);
     if (isNaN(parsed)) return 0;
-    return Math.max(0, Math.min(999, parsed));
+    return Math.max(0, Math.min(99, parsed));
   }
 
   function findDocument(number) {
@@ -380,10 +384,7 @@
 
   function indexStatusClass(number) {
     var record = findDocument(number);
-    if (!record) return 'index-pending';
-    if (record.status === STATUS.ARCHIVED) return 'index-archived';
-    if (record.status === STATUS.RECEIVED) return 'index-received';
-    return 'index-pending';
+    return statusClass(record ? record.status : 'P');
   }
 
   function renderMatrix() {
@@ -392,12 +393,12 @@
     clear(body);
     var year = byId('index-year').value;
     var page = clampIndexPage(byId('index-page').value);
-    var typeCode = indexType === 'draft' ? '11' : '00';
+    var typeCode = indexType === 'draft' ? '110' : '000';
     var start = page * 100;
     var end = start + 99;
     byId('index-page').value = page;
     byId('index-prev').disabled = page === 0;
-    byId('index-next').disabled = page === 999;
+    byId('index-next').disabled = page === 99;
     byId('index-range').textContent =
       buildDocumentNumber(year, typeCode, start) + '–' + buildDocumentNumber(year, typeCode, end);
     byId('index-draft').classList.toggle('active', indexType === 'draft');
@@ -406,11 +407,12 @@
     byId('index-receive').setAttribute('aria-pressed', String(indexType === 'receive'));
     for (var serial = start; serial <= end; serial += 1) {
       var number = buildDocumentNumber(year, typeCode, serial);
-      var button = el('button', 'document-cell ' + indexStatusClass(number), number);
+      var button = el('button', 'document-cell ' + indexStatusClass(number), String(serial % 100).padStart(2, '0'));
       button.type = 'button';
       button.dataset.documentNumber = number;
       var record = findDocument(number);
-      button.title = record ? record.status + (record.assignee ? '｜' + record.assignee : '') : '未收文';
+      button.title = number + '｜' + statusLabel(record ? record.status : 'P') + (record && record.latestRejectionReason ? '｜最近退文：' + record.latestRejectionReason + '｜' + (record.lastReturnDate || '') : '');
+      button.setAttribute('aria-label', button.title);
       body.appendChild(button);
     }
   }
@@ -483,10 +485,7 @@
       state = nextState;
       setConnectionStatus('synced', 'Firebase 已同步');
       renderAll();
-      if (lastReceivedNumber && findDocument(lastReceivedNumber)) {
-        showReceivedResult(lastReceivedNumber);
-        lastReceivedNumber = '';
-      }
+
     }, function (error) {
       setConnectionStatus('error', '離線／尚未同步');
       notify(firebaseErrorMessage(error), true);
@@ -519,7 +518,7 @@
     var normalized = normalizeIndexDocumentNumber(number);
     lastReceivedNumber = normalized;
     await firebaseStore.receive(normalized, currentAssignee);
-    notify('已登記為事務組簽收。');
+    notify('已登記為已收文。');
   }
 
   function renderManage() {
@@ -527,7 +526,7 @@
     clear(body);
     if (!canAccessStaff(role, currentAssignee)) return;
     var hasPending = state.documents.some(function (item) {
-      return item.status === STATUS.RECEIVED;
+      return statusModel.normalize(item.status) === STATUS.RECEIVED;
     });
     var records = filterAndSortPendingCases(state.documents, manageSearchQuery);
     if (!records.length) {
@@ -539,7 +538,7 @@
       var info = el('div');
       info.appendChild(el('strong', '', record.documentNumber));
       var badge = el('span', 'badge', statusLabel(record.status));
-      badge.dataset.status = record.status;
+      badge.dataset.status = statusModel.normalize(record.status);
       info.appendChild(badge);
       info.appendChild(el('small', '', '最後更新：' + record.updatedAt));
       row.appendChild(info);
@@ -667,6 +666,8 @@
     renderInputMode();
     renderMatrix();
     renderAssigneeSession();
+    renderQuery();
+    if (lastReceivedNumber && findDocument(lastReceivedNumber)) showReceivedResult(lastReceivedNumber);
   }
 
   function activate(name) {
@@ -759,23 +760,34 @@
     var button = event.target.closest('[data-document-number]');
     if (!button) return;
     try {
-      await runRegisterReceived(button.dataset.documentNumber);
+      var existing = findDocument(button.dataset.documentNumber);
+      if (existing) {
+        queriedNumber = existing.documentNumber;
+        byId('query-number').value = queriedNumber;
+        renderQuery();
+        activate('query');
+      } else {
+        await runRegisterReceived(button.dataset.documentNumber);
+      }
     } catch (error) {
       notify(error.message, true);
     }
   });
 
-  byId('query-form').addEventListener('submit', function (event) {
-    event.preventDefault();
+  var queriedNumber = '';
+  function renderQuery() {
+    if (!queriedNumber) return;
     var result = byId('query-result');
     clear(result);
+    var record = findDocument(queriedNumber);
+    result.appendChild(record ? recordCard(record) : el('p', 'empty', '查無此文號資料。'));
+  }
+  byId('query-form').addEventListener('submit', function (event) {
+    event.preventDefault();
     try {
-      var index = normalizeIndexDocumentNumber(byId('query-number').value);
-      var record = findDocument(index);
-      result.appendChild(record ? recordCard(record) : el('p', 'empty', '查無此文號資料。'));
-    } catch (error) {
-      notify(error.message, true);
-    }
+      queriedNumber = normalizeIndexDocumentNumber(byId('query-number').value);
+      renderQuery();
+    } catch (error) { notify(error.message, true); }
   });
 
   byId('reason').addEventListener('change', function () {
