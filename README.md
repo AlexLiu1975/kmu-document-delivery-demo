@@ -55,3 +55,11 @@ npm run report:usage -- 90
 報表產生於 `.reports/usage-report.html`，含依職號使用天數、登入／查詢／公文操作次數、失敗數、最近使用時間與每日統計。`.reports/usage-records.csv` 包含完整紀錄與 IP。資料使用臺灣時區彙整，預設讀取最近 30 天。報表在本機產生，已排除版本控制；請勿放到公開網站或提交 GitHub。此工具使用已固定版本的 Firebase CLI 授權介面，不需將金鑰放入前端。
 
 只涵蓋啟用後成功同步的紀錄，歷史 IP 無法補回，封鎖追蹤或離線可能少計。紀錄目前不自動刪除；管理者可在主控台依機關保存政策清理。每次造訪與操作各增加一次 Firestore 寫入，仍受 Spark 配額限制。先部署新 firestore.rules，再發布前端。
+
+### 網站管理報表
+
+首頁「使用報表（管理者）」按鈕開啟 `usage-report.html`，使用 Google 帳號登入，可選擇 7／30／90 天、依職號篩選並匯出含完整文號與 IP 的 CSV。管理者登入使用獨立 Firebase app 與記憶體登入狀態，不影響公文登記簿的職號登入。
+
+Firestore `reportAdmins/{Google 帳號 email}` 的 `enabled: true` 為報表授權名單；目前只授權 `beyle931224@gmail.com`。僅已驗證的 Google 登入帳號且名單啟用者可讀取 `usageRecords`；瀏覽器不能修改授權名單或刪改使用紀錄。名單由 Firebase Console 的專案管理者維護。
+
+Firebase Authentication 必須啟用 Google 登入，並將 `alexliu1975.github.io` 加入已授權網域。報表讀取原始紀錄，使用量增加時可改為後端每日彙總以減少 Firestore 讀取。

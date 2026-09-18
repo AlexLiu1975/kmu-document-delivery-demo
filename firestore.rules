@@ -136,6 +136,18 @@ service cloud.firestore {
       }
     }
 
+    function reportAdmin() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && exists(/databases/$(database)/documents/reportAdmins/$(request.auth.token.email))
+        && get(/databases/$(database)/documents/reportAdmins/$(request.auth.token.email)).data.enabled == true;
+    }
+    match /reportAdmins/{email} {
+      allow get: if reportAdmin() && request.auth.token.email == email;
+      allow list, write: if false;
+    }
+
     // These records contain employee numbers and full IPs. Read through project IAM only.
     match /usageRecords/{recordId} {
       allow create: if signedIn()
@@ -153,7 +165,8 @@ service cloud.firestore {
         && request.resource.data.result in ['success','not_found','failure']
         && request.resource.data.errorCode is string && request.resource.data.errorCode.size() <= 100
         && request.resource.data.occurredAt == request.time;
-      allow read, update, delete: if false;
+      allow read: if reportAdmin();
+      allow update, delete: if false;
     }
 
     match /{path=**}/events/{eventId} {

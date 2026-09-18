@@ -9,6 +9,7 @@ const {
   initializeTestEnvironment
 } = require('@firebase/rules-unit-testing');
 const {
+  collection,
   collectionGroup,
   deleteDoc,
   doc,
@@ -223,4 +224,21 @@ test('anonymous page views and unavailable IP are valid, unauthenticated telemet
  const data={employeeNumber:'',documentNumber:'',ip:'',ipStatus:'unavailable',visitorId:'v1',sessionId:'s1',authUid:'uid-a',action:'PAGE_VIEW',result:'success',errorCode:'',occurredAt:serverTimestamp()};
  await assertSucceeds(setDoc(doc(environment.authenticatedContext('uid-a').firestore(),'usageRecords/view-a'),data));
  await assertFails(setDoc(doc(environment.unauthenticatedContext().firestore(),'usageRecords/view-b'),data));
+});
+
+test('only verified Google report administrators may read usage records', async()=>{
+ const {serverTimestamp}=require('firebase/firestore');
+ await environment.withSecurityRulesDisabled(async context=>{
+  await setDoc(doc(context.firestore(),'reportAdmins/beyle931224@gmail.com'),{enabled:true});
+  await setDoc(doc(context.firestore(),'usageRecords/admin-test'),{occurredAt:serverTimestamp(),ip:'203.0.113.7'});
+ });
+ const claims={email:'beyle931224@gmail.com',email_verified:true,firebase:{sign_in_provider:'google.com'}};
+ const admin=environment.authenticatedContext('google-admin',claims).firestore();
+ await assertSucceeds(getDoc(doc(admin,'usageRecords/admin-test')));
+ await assertSucceeds(getDoc(doc(admin,'reportAdmins/beyle931224@gmail.com')));
+ await assertSucceeds(getDocs(collection(admin,'usageRecords')));
+ await assertFails(getDoc(doc(environment.authenticatedContext('other-google',{...claims,email:'other@example.com'}).firestore(),'usageRecords/admin-test')));
+ await assertFails(getDoc(doc(environment.authenticatedContext('unverified',{...claims,email_verified:false}).firestore(),'usageRecords/admin-test')));
+ await assertFails(getDoc(doc(environment.authenticatedContext('anonymous',{...claims,firebase:{sign_in_provider:'anonymous'}}).firestore(),'usageRecords/admin-test')));
+ await assertFails(setDoc(doc(admin,'reportAdmins/other@example.com'),{enabled:true}));
 });
