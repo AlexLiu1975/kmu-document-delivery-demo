@@ -1,0 +1,30 @@
+'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
+const {getGlobalDefaultAccount}=require('firebase-tools/lib/auth');
+const {requireAuth}=require('firebase-tools/lib/requireAuth');
+const {Client}=require('firebase-tools/lib/apiv2');
+const usage=require('../usage-core');
+const escape=value=>String(value==null?'':value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const csv=value=>'"'+String(value==null?'':value).replace(/^[=+@-]/,'\u0027$&').replace(/"/g,'""')+'"';
+async function main(){
+ const account=getGlobalDefaultAccount();if(!account)throw Error('請先執行 firebase login，以具備專案讀取權限的 Google 帳號登入。');
+ const project=JSON.parse(fs.readFileSync(path.join(__dirname,'..','.firebaserc'),'utf8')).projects.default;
+ await requireAuth({project,...account});
+ const client=new Client({urlPrefix:'https://firestore.googleapis.com',apiVersion:'v1'});
+ const days=Number(process.argv[2]||30);if(!Number.isInteger(days)||days<1||days>3650)throw Error('報表天數必須為 1–3650。');
+ const since=new Date(Date.now()-days*86400000).toISOString();
+ const response=await client.post('projects/'+project+'/databases/(default)/documents:runQuery',{structuredQuery:{from:[{collectionId:'usageRecords'}],where:{fieldFilter:{field:{fieldPath:'occurredAt'},op:'GREATER_THAN_OR_EQUAL',value:{timestampValue:since}}},orderBy:[{field:{fieldPath:'occurredAt'},direction:'DESCENDING'}]}});
+ const records=(response.body||[]).filter(r=>r.document).map(r=>Object.fromEntries(Object.entries(r.document.fields).map(([k,v])=>[k,v.stringValue??v.timestampValue??v.integerValue??''])));
+ const report=usage.summarize(records);
+ const columns=['employeeNumber','activeDays','logins','queries','received','returned','archived','failures','lastUsed'];
+ const labels=['職號','使用天數','成功登入','查詢','成功收文','成功退文','成功歸檔','失敗','最近使用'];
+ const table=(cols,titles,rows)=>'<table><thead><tr>'+titles.map(x=>'<th>'+escape(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+escape(r[c])+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+ const rawCols=['occurredAt','employeeNumber','documentNumber','ip','ipStatus','action','result','errorCode','visitorId','sessionId','authUid'];
+ const dir=path.join(__dirname,'..','.reports');fs.mkdirSync(dir,{recursive:true});
+ const html='<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>公文網站使用報表</title><style>body{font:16px system-ui;background:#f5f7fa;color:#17324a;margin:32px}table{border-collapse:collapse;background:white;width:100%;margin:20px 0}td,th{padding:10px;border:1px solid #d6dee7;text-align:left}th{background:#e6eff5}section{overflow:auto}h1{font-size:26px}</style><h1>公文網站使用報表</h1><p>最近 '+days+' 天；產生時間 '+escape(new Date().toISOString())+'。統計日界線採臺灣時間。</p><p>瀏覽器訪客 '+report.visitors+'｜回訪瀏覽器 '+report.returningVisitors+'｜工作階段 '+report.sessions+'｜紀錄 '+report.records+'</p><p>匿名 UID 與 IP 不是人數。職號由使用者輸入、IP 由瀏覽器查詢，均非本人身分驗證。回訪可依同一訪客代碼跨工作階段比對。</p><h2>依職號使用情況</h2><section>'+table(columns,labels,report.employees)+'</section><h2>每日使用情況</h2><section>'+table(['date','views','logins','operations','failures'],['日期','頁面造訪','成功登入','成功公文操作','失敗'],report.daily)+'</section><details><summary>完整操作紀錄（含 IP，限管理者）</summary><section>'+table(rawCols,['時間','職號','文號','完整 IP','IP 狀態','功能','結果','錯誤類型','訪客代碼','工作階段','UID'],records)+'</section></details><p>舊資料沒有登入 IP，無法補回。本報表只涵蓋啟用後成功同步的紀錄；阻擋追蹤、斷線等情況可能少計。</p></html>';
+ fs.writeFileSync(path.join(dir,'usage-report.html'),html);
+ fs.writeFileSync(path.join(dir,'usage-records.csv'),'\uFEFF'+[rawCols.map(csv).join(','),...records.map(r=>rawCols.map(c=>csv(r[c])).join(','))].join('\r\n'));
+ console.log('報表已產生：'+path.join(dir,'usage-report.html')+'（'+records.length+' 筆）');
+}
+main().catch(e=>{console.error(e.message);process.exitCode=1;});

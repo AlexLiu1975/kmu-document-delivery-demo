@@ -7,6 +7,7 @@ import {
   signOut
 } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js';
 import {
+  addDoc,
   collection,
   collectionGroup,
   doc,
@@ -26,6 +27,49 @@ const app = initializeApp(firebaseConfig);
 const auth = initializeAuth(app, { persistence: inMemoryPersistence });
 const database = getFirestore(app);
 let employeeNumber = '';
+let anonymousLogin = null;
+let ipPromise = null;
+const randomId = () => crypto.randomUUID();
+function storedId(storage, key) {
+  try { let value = storage.getItem(key); if (!value) { value = randomId(); storage.setItem(key, value); } return value; }
+  catch { return randomId(); }
+}
+let visitorId;
+let sessionId;
+try { visitorId = storedId(localStorage, 'kmu-usage-visitor'); } catch { visitorId = randomId(); }
+try { sessionId = storedId(sessionStorage, 'kmu-usage-session'); } catch { sessionId = randomId(); }
+async function ensureAnonymous() {
+  if (auth.currentUser) return;
+  if (!anonymousLogin) anonymousLogin = signInAnonymously(auth).finally(() => { anonymousLogin = null; });
+  await anonymousLogin;
+}
+async function publicIp() {
+  if (!ipPromise) ipPromise = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+    try {
+      const response = await fetch('https://api64.ipify.org?format=json', {signal:controller.signal,credentials:'omit',referrerPolicy:'no-referrer',cache:'no-store'});
+      if (!response.ok) return '';
+      return window.UsageCore.normalizeIp((await response.json()).ip);
+    } catch { return ''; } finally { clearTimeout(timer); }
+  })();
+  return ipPromise;
+}
+async function recordUsage(action, number = '', result = 'success', errorCode = '', identity = null) {
+  // Capture identity before asynchronous IP lookup so logout or a new login cannot relabel the event.
+  const actor = identity ? identity.actor : employeeNumber;
+  try {
+    await ensureAnonymous();
+    const uid = identity ? identity.uid : auth.currentUser.uid;
+    const ip = await publicIp();
+    if (!auth.currentUser || auth.currentUser.uid !== uid) return;
+    const record = window.UsageCore.buildRecord({employeeNumber:actor,documentNumber:number,ip,visitorId,sessionId,authUid:uid},action,result,errorCode,serverTimestamp());
+    await addDoc(collection(database, 'usageRecords'), record);
+    window.dispatchEvent(new CustomEvent('usage-record-status', {detail:'synced'}));
+  } catch {
+    window.dispatchEvent(new CustomEvent('usage-record-status', {detail:'failed'}));
+  }
+}
 
 function timestampText(value) {
   if (!value || typeof value.toDate !== 'function') return '';
@@ -55,11 +99,13 @@ function normalizeSnapshotData(data) {
 
 async function login(value) {
   employeeNumber = core.validateEmployeeNumber(value);
-  if (!auth.currentUser) await signInAnonymously(auth);
+  await ensureAnonymous();
+  void recordUsage('LOGIN');
   return { uid: auth.currentUser.uid, employeeNumber };
 }
 
 async function logout() {
+  ipPromise = null;
   employeeNumber = '';
   if (auth.currentUser) await signOut(auth);
 }
@@ -76,6 +122,7 @@ async function mutate(documentNumber, actor, operation, reason) {
   const session = requireSession(actor);
   const documentRef = doc(database, 'documents', documentNumber);
   const eventRef = doc(collection(documentRef, 'events'));
+  try {
   await runTransaction(database, async (transaction) => {
     const snapshot = await transaction.get(documentRef);
     const current = snapshot.exists() ? snapshot.data() : null;
@@ -91,6 +138,11 @@ async function mutate(documentNumber, actor, operation, reason) {
     transaction.set(documentRef, mutation.document);
     transaction.set(eventRef, mutation.event);
   });
+  void recordUsage(operation, documentNumber, 'success', '', session);
+  } catch (error) {
+    void recordUsage(operation, documentNumber, 'failure', error.code || 'operation-failed', session);
+    throw error;
+  }
 }
 
 function subscribe(onData, onError) {
@@ -121,6 +173,7 @@ function subscribe(onData, onError) {
 }
 
 window.firebaseDocumentStore = {
+  recordUsage,
   login,
   logout,
   subscribe,
@@ -129,3 +182,5 @@ window.firebaseDocumentStore = {
   archive: (number, actor) => mutate(number, actor, 'ARCHIVE', '')
 };
 window.dispatchEvent(new CustomEvent('firebase-store-ready'));
+
+void recordUsage('PAGE_VIEW');
