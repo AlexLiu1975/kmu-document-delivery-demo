@@ -407,7 +407,7 @@
     byId('index-receive').setAttribute('aria-pressed', String(indexType === 'receive'));
     for (var serial = start; serial <= end; serial += 1) {
       var number = buildDocumentNumber(year, typeCode, serial);
-      var button = el('button', 'document-cell ' + indexStatusClass(number), String(serial % 100).padStart(2, '0'));
+      var button = el('button', 'document-cell ' + indexStatusClass(number), number);
       button.type = 'button';
       button.dataset.documentNumber = number;
       var record = findDocument(number);
