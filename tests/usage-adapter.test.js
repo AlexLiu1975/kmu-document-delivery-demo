@@ -3,11 +3,11 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const test=require('node:test');
 const assert=require('node:assert/strict');
-function adapter(ipFails=false, staffAllowed=true){
+function adapter(ipFails=false, staffAllowed=true, authDelay=0){
  const writes=[],auth={currentUser:null};
  const storage=new Map();
  const window={FirebaseStoreCore:require('../firebase-store-core'),UsageCore:require('../usage-core'),dispatchEvent:()=>{}};
- const context={window,crypto:require('node:crypto').webcrypto,URL,AbortController,setTimeout,clearTimeout,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},initializeApp:()=>({}),initializeAuth:()=>auth,browserSessionPersistence:{},signInWithEmailAndPassword:async(a,email,password)=>{if(password!=='fixture-password-123')throw Error('invalid');auth.currentUser={uid:'staff-a',isAnonymous:false};},getDoc:async()=>({exists:()=>staffAllowed,data:()=>({enabled:true,employeeNumber:'1115034'})}),updatePassword:async()=>{},signInAnonymously:async()=>{auth.currentUser={uid:'uid-a',isAnonymous:true};},signOut:async()=>{auth.currentUser=null;},getFirestore:()=>({}),firebaseConfig:{},collection:()=>({}),doc:()=>({}),serverTimestamp:()=> 'TIME',addDoc:async(ref,record)=>writes.push(record),runTransaction:async(db,callback)=>{await callback({get:async()=>({exists:()=>false}),set:()=>{}});},fetch:async()=>{if(ipFails)throw Error('offline');return {ok:true,json:async()=>({ip:'203.0.113.7'})};}};
+ const context={window,crypto:require('node:crypto').webcrypto,URL,AbortController,setTimeout,clearTimeout,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},initializeApp:()=>({}),initializeAuth:()=>auth,browserSessionPersistence:{},signInWithEmailAndPassword:async(a,email,password)=>{if(password!=='fixture-password-123')throw Error('invalid');auth.currentUser={uid:'staff-a',isAnonymous:false};},getDoc:async()=>({exists:()=>staffAllowed&&!auth.currentUser?.isAnonymous,data:()=>({enabled:true,employeeNumber:'1115034'})}),updatePassword:async()=>{},signInAnonymously:async()=>{if(authDelay)await new Promise(r=>setTimeout(r,authDelay));auth.currentUser={uid:'uid-a',isAnonymous:true};},signOut:async()=>{auth.currentUser=null;},getFirestore:()=>({}),firebaseConfig:{},collection:()=>({}),doc:()=>({}),serverTimestamp:()=> 'TIME',addDoc:async(ref,record)=>writes.push(record),runTransaction:async(db,callback)=>{await callback({get:async()=>({exists:()=>false}),set:()=>{}});},fetch:async()=>{if(ipFails)throw Error('offline');return {ok:true,json:async()=>({ip:'203.0.113.7'})};}};
  const source=fs.readFileSync(require.resolve('../firebase-store.js'),'utf8').replace(/^import[\s\S]*?;\s*/gm,'');
  vm.runInNewContext(source,context,{filename:'firebase-store.js'});
  return {store:window.firebaseDocumentStore,writes};
@@ -33,3 +33,5 @@ test('staff password login validates UID authorization and can restore session',
 test('password login cannot grant access without protected staff UID authorization',async()=>{
  const {store}=adapter(false,false);await settle();await assert.rejects(()=>store.login('1115034','fixture-password-123'),/尚未啟用/);assert.equal(await store.staffSession(),null);
 });
+
+test('immediate staff login waits for initial anonymous sign-in before password sign-in',async()=>{const {store}=adapter(false,true,30);await store.login('1115034','fixture-password-123');await new Promise(r=>setTimeout(r,60));assert.equal((await store.staffSession()).employeeNumber,'1115034');});

@@ -116,6 +116,7 @@ async function staffSession() {
 async function login(value,password) {
   const actor=core.validateEmployeeNumber(value);
   if(['1107054','1115034'].includes(actor)) {
+    await ensureAnonymous();
     if(!password) throw Error('管理職號請輸入密碼。');
     try {
       sessionStorage.setItem('kmu-staff-deadline',String(Date.now()+600000));
