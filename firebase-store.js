@@ -43,12 +43,13 @@ function timestampText(value) {
 
 function normalizeSnapshotData(data) {
   const normalized = { ...data };
-  ['createdAt', 'updatedAt', 'occurredAt'].forEach((field) => {
+  ['createdAt', 'updatedAt', 'occurredAt', 'receivedAt', 'archivedAt', 'lastReturnDate'].forEach((field) => {
     if (normalized[field]) {
       normalized[field + 'Millis'] = normalized[field].toMillis();
       normalized[field] = timestampText(normalized[field]);
     }
   });
+  if ('status' in normalized) normalized.status = window.DocumentStatus.normalize(normalized.status);
   return normalized;
 }
 

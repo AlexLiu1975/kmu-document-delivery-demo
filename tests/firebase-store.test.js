@@ -34,7 +34,7 @@ test('builds a create mutation with matching document and event data', () => {
     'SERVER_TIME'
   );
   assert.equal(mutation.isCreate, true);
-  assert.equal(mutation.document.status, '已收文');
+  assert.equal(mutation.document.status, 'R');
   assert.equal(mutation.document.revision, 1);
   assert.equal(mutation.event.action, '承辦人收文');
   assert.equal(mutation.event.authUid, 'anonymous-uid');
@@ -48,7 +48,7 @@ test('builds rejected, re-received, and archived transaction mutations', () => {
     received, '1151100016', '7654321', 'REJECT',
     '缺少發文日期', 'uid-b', 'T2'
   );
-  assert.equal(rejected.document.status, '已退文');
+  assert.equal(rejected.document.status, 'B');
   assert.equal(rejected.document.latestRejectionActor, '7654321');
   assert.equal(rejected.event.reason, '缺少發文日期');
 
@@ -61,7 +61,7 @@ test('builds rejected, re-received, and archived transaction mutations', () => {
   const archived = core.buildMutation(
     receivedAgain.document, '1151100016', '7654321', 'ARCHIVE', '', 'uid-b', 'T4'
   );
-  assert.equal(archived.document.status, '已歸檔');
+  assert.equal(archived.document.status, 'A');
   assert.equal(archived.document.revision, 4);
   assert.throws(() => core.buildMutation(
     archived.document, '1151100016', '1115034', 'RECEIVE', '', 'uid-a', 'T5'

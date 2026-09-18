@@ -61,8 +61,8 @@ textarea { min-height: 92px; resize: vertical; }
 .record-row { display: grid; grid-template-columns: 125px 1fr; gap: 12px; }
 .record-label { color: var(--muted); }
 .badge { display: inline-flex; width: fit-content; margin: 0 10px; padding: 3px 9px; border-radius: 999px; color: var(--navy); background: #e9f3f7; font-size: .84rem; }
-.badge[data-status="已退文"] { color: var(--danger); background: #ffeded; }
-.badge[data-status="已收文"] { color: #a32f2f; background: #ffeded; }
+.badge[data-status="B"] { color: var(--danger); background: #ffeded; }
+.badge[data-status="R"] { color: #a32f2f; background: #ffeded; }
 .case-list, .history-list { margin-top: 18px; }
 .case-list { display: grid; gap: 10px; }
 .case-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px; border: 1px solid var(--line); border-radius: 12px; }
@@ -202,3 +202,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   }
   .history-table td::before { content: attr(data-label); color: var(--muted); font-weight: 750; }
 }
+
+.badge[data-status="P"] { color: #647580; background: #edf0f2; }
+.badge[data-status="B"] { color: #9a4700; background: #ffedd5; }
+.badge[data-status="A"] { color: #15803d; background: #d3f2e0; }
+.index-returned { color: #b45309; }
+.document-cell.index-returned { border: 2px solid #d97706; background: #ffedd5; color: #9a4700; }
+.document-cell.index-returned::after { content: "↩"; position: absolute; top: 2px; right: 5px; }

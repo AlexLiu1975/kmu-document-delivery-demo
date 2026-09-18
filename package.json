@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "test": "node --test tests/demo.test.js tests/firebase-store.test.js",
+    "test": "node --test tests/demo.test.js tests/firebase-store.test.js tests/status-regression.test.js",
     "test:rules": "firebase emulators:exec --only firestore \"node --test tests/firestore.rules.test.js\"",
     "test:all": "npm test && npm run test:rules"
   },
