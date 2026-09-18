@@ -58,8 +58,8 @@ npm run report:usage -- 90
 
 ### 網站管理報表
 
-首頁「使用報表（管理者）」按鈕開啟 `usage-report.html`，使用 Google 帳號登入，可選擇 7／30／90 天、依職號篩選並匯出含完整文號與 IP 的 CSV。管理者登入使用獨立 Firebase app 與記憶體登入狀態，不影響公文登記簿的職號登入。
+管理職號 1107054、1115034 使用職號＋密碼登入，登入後首頁顯示「使用報表（管理者）」。同分頁開啟報表共用 Firebase session 登入，不需另登入 Google 或輸入 email。一般職號保持匿名登入。報表可依 7／30／90 天與職號篩選，匯出完整文號及 IP。
 
-Firestore `reportAdmins/{Google 帳號 email}` 的 `enabled: true` 為報表授權名單；目前只授權 `beyle931224@gmail.com`。僅已驗證的 Google 登入帳號且名單啟用者可讀取 `usageRecords`；瀏覽器不能修改授權名單或刪改使用紀錄。名單由 Firebase Console 的專案管理者維護。
+管理者使用 Firebase Authentication Email/Password 帳號，內部帳號地址為 {職號}@staff.kmu-document-delivery.invalid，介面只要求職號與密碼。啟用 Email/Password 後由專案管理者建立帳號，將 UID 登記在 staffAdmins/{UID}，欄位 enabled:true、employeeNumber:管理職號。瀏覽器不能建立或修改此授權名單；只有 password 登入且 UID 名單啟用者能讀取 usageRecords。原 Google 報表授權不再授予紀錄讀取權限。
 
-Firebase Authentication 必須啟用 Google 登入，並將 `alexliu1975.github.io` 加入已授權網域。報表讀取原始紀錄，使用量增加時可改為後端每日彙總以減少 Firestore 讀取。
+登入狀態存在同分頁 sessionStorage，閒置10分鐘自動登出；登入後可在頁首「修改管理密碼」設定至少12字元的新密碼。忘記密碼時請聯絡專案管理者重設。初始密碼不得提交 GitHub 或放在公開網站。

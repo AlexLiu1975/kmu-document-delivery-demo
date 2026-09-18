@@ -455,6 +455,8 @@
     }
     state = emptyState();
     byId('assignee').value = '';
+    byId('staff-password').value = '';
+    byId('staff-password').hidden = true;
     renderAll();
     if (firebaseStore) {
       try {
@@ -472,9 +474,9 @@
     if (!currentAssignee) return;
     if (sessionTimer) window.clearTimeout(sessionTimer);
     sessionDeadline = Date.now() + SESSION_TIMEOUT_MS;
-    sessionTimer = window.setTimeout(function () {
-      logoutAssignee(true);
-    }, SESSION_TIMEOUT_MS);
+    if(STAFF_EMPLOYEE_NUMBERS.indexOf(currentAssignee)>=0)sessionStorage.setItem('kmu-staff-deadline',String(sessionDeadline));
+    function checkExpiry(){var shared=Number(sessionStorage.getItem('kmu-staff-deadline'));if(STAFF_EMPLOYEE_NUMBERS.indexOf(currentAssignee)>=0&&shared>Date.now()){sessionDeadline=shared;sessionTimer=window.setTimeout(checkExpiry,shared-Date.now());return;}logoutAssignee(true);}
+    sessionTimer = window.setTimeout(checkExpiry, SESSION_TIMEOUT_MS);
     if (!sessionInterval) {
       sessionInterval = window.setInterval(updateSessionCountdown, 1000);
     }
@@ -498,7 +500,9 @@
     if (!firebaseStore) throw new Error('Firebase 尚在連線中，請稍後再試。');
     var employeeNumber = normalizeAssignee(byId('assignee').value);
     setConnectionStatus('connecting', 'Firebase 登入中');
-    await firebaseStore.login(employeeNumber);
+    await firebaseStore.login(employeeNumber, byId('staff-password').value);
+    byId('staff-password').value = '';
+    if (STAFF_EMPLOYEE_NUMBERS.indexOf(employeeNumber) >= 0) role = 'staff';
     currentAssignee = employeeNumber;
     startFirebaseSubscription();
     resetSessionTimer();
@@ -662,6 +666,8 @@
     byId('role-toggle').disabled = !canSwitchRole(currentAssignee);
     byId('role-toggle').title = currentAssignee ? '請先登出目前職號' : '';
     byId('tab-manage').hidden = !staffAccess;
+    byId('usage-report-button').hidden = !staffAccess;
+    byId('staff-password-change').hidden = !staffAccess;
     if (!staffAccess && byId('panel-manage').classList.contains('active')) activate('deliver');
     renderManage();
     renderHistory();
@@ -825,15 +831,19 @@
     var badge = byId('usage-status');
     if (badge) badge.textContent = event.detail === 'synced' ? '使用紀錄已同步' : '使用紀錄尚未同步';
   });
+  byId('staff-save-password').addEventListener('click',async function(){try{if(byId('staff-new-password').value!==byId('staff-confirm-password').value)throw Error('兩次輸入的密碼不相同。');await firebaseStore.changePassword(byId('staff-new-password').value);byId('staff-new-password').value='';byId('staff-confirm-password').value='';notify('管理密碼已更新。');}catch(error){notify(error.message,true);}});
+  byId('assignee').addEventListener('input', function(){byId('staff-password').hidden = STAFF_EMPLOYEE_NUMBERS.indexOf(byId('assignee').value.trim()) < 0;});
   renderAll();
-  function connectFirebaseStore() {
+  async function connectFirebaseStore() {
     firebaseStore = window.firebaseDocumentStore;
     if (!firebaseStore) {
       setConnectionStatus('error', 'Firebase 設定未完成');
       return;
     }
     setConnectionStatus('ready', 'Firebase 已連線，請登入職號');
+    try {var session = await firebaseStore.staffSession();if(session){currentAssignee=session.employeeNumber;role='staff';startFirebaseSubscription();resetSessionTimer();renderAll();}}catch(error){notify(error.message,true);}
   }
+  window.addEventListener('pageshow',function(event){if(event.persisted)location.reload();});
   window.addEventListener('firebase-store-ready', connectFirebaseStore, { once: true });
   if (window.firebaseDocumentStore) connectFirebaseStore();
   window.setTimeout(function () {

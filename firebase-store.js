@@ -1,7 +1,9 @@
 import { initializeApp } from
   'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import {
-  inMemoryPersistence,
+  browserSessionPersistence,
+  signInWithEmailAndPassword,
+  updatePassword,
   initializeAuth,
   signInAnonymously,
   signOut
@@ -12,6 +14,7 @@ import {
   collectionGroup,
   doc,
   getFirestore,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -24,7 +27,7 @@ const core = window.FirebaseStoreCore;
 if (!core) throw new Error('Firebase 資料驗證模組載入失敗。');
 
 const app = initializeApp(firebaseConfig);
-const auth = initializeAuth(app, { persistence: inMemoryPersistence });
+const auth = initializeAuth(app, { persistence: browserSessionPersistence });
 const database = getFirestore(app);
 let employeeNumber = '';
 let anonymousLogin = null;
@@ -39,6 +42,7 @@ let sessionId;
 try { visitorId = storedId(localStorage, 'kmu-usage-visitor'); } catch { visitorId = randomId(); }
 try { sessionId = storedId(sessionStorage, 'kmu-usage-session'); } catch { sessionId = randomId(); }
 async function ensureAnonymous() {
+  if (auth.authStateReady) await auth.authStateReady();
   if (auth.currentUser) return;
   if (!anonymousLogin) anonymousLogin = signInAnonymously(auth).finally(() => { anonymousLogin = null; });
   await anonymousLogin;
@@ -97,14 +101,40 @@ function normalizeSnapshotData(data) {
   return normalized;
 }
 
-async function login(value) {
-  employeeNumber = core.validateEmployeeNumber(value);
-  await ensureAnonymous();
+async function staffSession() {
+  if(auth.authStateReady) await auth.authStateReady();
+  if(!auth.currentUser || auth.currentUser.isAnonymous) return null;
+  const deadline=Number(sessionStorage.getItem('kmu-staff-deadline'));
+  if(!deadline||Date.now()>=deadline){await signOut(auth);return null;}
+  const user=auth.currentUser;
+  const row=await getDoc(doc(database,'staffAdmins',user.uid));
+  if(auth.currentUser?.uid!==user.uid)return null;
+  if(!row.exists()||row.data().enabled!==true||!['1107054','1115034'].includes(row.data().employeeNumber)) throw Error('此帳號沒有事務組權限。');
+  employeeNumber=row.data().employeeNumber;
+  return {employeeNumber,uid:auth.currentUser.uid};
+}
+async function login(value,password) {
+  const actor=core.validateEmployeeNumber(value);
+  if(['1107054','1115034'].includes(actor)) {
+    if(!password) throw Error('管理職號請輸入密碼。');
+    try {
+      sessionStorage.setItem('kmu-staff-deadline',String(Date.now()+600000));
+      await signInWithEmailAndPassword(auth,actor+'@staff.kmu-document-delivery.invalid',password);
+      const session=await staffSession();
+      if(!session||session.employeeNumber!==actor) throw Error('管理職號不符。');
+    } catch(error) { employeeNumber='';await signOut(auth);throw Error('管理職號或密碼錯誤，或帳號尚未啟用。'); }
+  } else { await ensureAnonymous();if(!auth.currentUser.isAnonymous){await signOut(auth);await ensureAnonymous();}employeeNumber=actor; }
   void recordUsage('LOGIN');
   return { uid: auth.currentUser.uid, employeeNumber };
 }
 
+async function changePassword(password) {
+  if(!await staffSession()) throw Error('請先登入管理職號。');
+  if(String(password).length<12) throw Error('新密碼至少需要12個字元。');
+  await updatePassword(auth,password);
+}
 async function logout() {
+  sessionStorage.removeItem('kmu-staff-deadline');
   ipPromise = null;
   employeeNumber = '';
   if (auth.currentUser) await signOut(auth);
@@ -174,6 +204,8 @@ function subscribe(onData, onError) {
 
 window.firebaseDocumentStore = {
   recordUsage,
+  staffSession,
+  changePassword,
   login,
   logout,
   subscribe,
