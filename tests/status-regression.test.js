@@ -45,3 +45,8 @@ test('document numbers use 3-digit year, 3-digit type and 4-digit serial', () =>
  assert.equal(app.buildDocumentNumber('115', '110', 3143), '1151103143');
  assert.equal(app.buildDocumentNumber('115', '000', 3143), '1150003143');
 });
+
+test('three-digit page 107 plus selected cell 97 preserves a ten-digit number', () => {
+  assert.equal(app.buildDocumentNumber('115', '00', 107 * 100 + 97), '1150010797');
+  assert.equal(app.buildDocumentNumber('115', '11', 999 * 100 + 99), '1151199999');
+});

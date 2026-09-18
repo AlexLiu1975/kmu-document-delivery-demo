@@ -36,8 +36,10 @@
   }
 
   function buildDocumentNumber(year, typeCode, serial) {
-    return String(year).padStart(3, '0') + String(typeCode).padStart(3, '0') +
-      String(serial).padStart(4, '0');
+    var code = String(typeCode);
+    var serialWidth = code.length === 3 ? 4 : 5;
+    return String(year).padStart(3, '0') + code.padStart(code.length === 3 ? 3 : 2, '0') +
+      String(serial).padStart(serialWidth, '0');
   }
 
   function normalizeIndexDocumentNumber(value) {
@@ -375,7 +377,7 @@
   function clampIndexPage(value) {
     var parsed = parseInt(value, 10);
     if (isNaN(parsed)) return 0;
-    return Math.max(0, Math.min(99, parsed));
+    return Math.max(0, Math.min(999, parsed));
   }
 
   function findDocument(number) {
@@ -393,12 +395,12 @@
     clear(body);
     var year = byId('index-year').value;
     var page = clampIndexPage(byId('index-page').value);
-    var typeCode = indexType === 'draft' ? '110' : '000';
+    var typeCode = indexType === 'draft' ? '11' : '00';
     var start = page * 100;
     var end = start + 99;
     byId('index-page').value = page;
     byId('index-prev').disabled = page === 0;
-    byId('index-next').disabled = page === 99;
+    byId('index-next').disabled = page === 999;
     byId('index-range').textContent =
       buildDocumentNumber(year, typeCode, start) + '–' + buildDocumentNumber(year, typeCode, end);
     byId('index-draft').classList.toggle('active', indexType === 'draft');
