@@ -136,6 +136,17 @@ service cloud.firestore {
       }
     }
 
+    function staffReportAdmin() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'password'
+        && exists(/databases/$(database)/documents/staffAdmins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/staffAdmins/$(request.auth.uid)).data.enabled == true
+        && isStaffEmployee(get(/databases/$(database)/documents/staffAdmins/$(request.auth.uid)).data.employeeNumber);
+    }
+    match /staffAdmins/{uid} {
+      allow get: if staffReportAdmin() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
     function reportAdmin() {
       return signedIn()
         && request.auth.token.email_verified == true
@@ -165,7 +176,7 @@ service cloud.firestore {
         && request.resource.data.result in ['success','not_found','failure']
         && request.resource.data.errorCode is string && request.resource.data.errorCode.size() <= 100
         && request.resource.data.occurredAt == request.time;
-      allow read: if reportAdmin();
+      allow read: if staffReportAdmin();
       allow update, delete: if false;
     }
 

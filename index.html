@@ -23,7 +23,7 @@
       <div class="role-box">
         <span>目前身分</span>
         <strong id="role-label">一般測試人員</strong>
-        <a class="button secondary" href="usage-report.html" target="_blank" rel="noopener">使用報表（管理者）</a>
+        <a id="usage-report-button" class="button secondary" href="usage-report.html" hidden>使用報表（管理者）</a>
         <button id="role-toggle" class="link-button" type="button">切換一般人員／事務組</button>
         <div id="assignee-session" class="assignee-session header-session" hidden>
           <div class="login-state">
@@ -31,6 +31,7 @@
             <span>職號：<b id="current-assignee"></b></span>
           </div>
           <strong id="session-countdown" class="session-countdown">自動登出倒數 10:00</strong>
+          <details id="staff-password-change" hidden><summary>修改管理密碼</summary><input id="staff-new-password" type="password" autocomplete="new-password" placeholder="新密碼（至少12個字元）" aria-label="新密碼"><input id="staff-confirm-password" type="password" autocomplete="new-password" placeholder="再次輸入新密碼" aria-label="確認新密碼"><button id="staff-save-password" type="button" class="button secondary">儲存新密碼</button></details>
           <button id="assignee-logout" class="button header-logout" type="button">登出</button>
         </div>
       </div>
@@ -60,6 +61,7 @@
           <div class="assignee-login-row">
             <input id="assignee" inputmode="numeric" maxlength="7" pattern="[0-9]{7}"
               autocomplete="off" placeholder="輸入職號">
+            <input id="staff-password" type="password" autocomplete="current-password" placeholder="管理者密碼" aria-label="管理者密碼" hidden>
             <button id="assignee-login" class="button primary" type="button">登入</button>
           </div>
         </div>

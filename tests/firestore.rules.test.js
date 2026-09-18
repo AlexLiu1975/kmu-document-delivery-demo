@@ -226,7 +226,7 @@ test('anonymous page views and unavailable IP are valid, unauthenticated telemet
  await assertFails(setDoc(doc(environment.unauthenticatedContext().firestore(),'usageRecords/view-b'),data));
 });
 
-test('only verified Google report administrators may read usage records', async()=>{
+test('legacy Google authorization cannot grant usage record reads', async()=>{
  const {serverTimestamp}=require('firebase/firestore');
  await environment.withSecurityRulesDisabled(async context=>{
   await setDoc(doc(context.firestore(),'reportAdmins/beyle931224@gmail.com'),{enabled:true});
@@ -234,11 +234,19 @@ test('only verified Google report administrators may read usage records', async(
  });
  const claims={email:'beyle931224@gmail.com',email_verified:true,firebase:{sign_in_provider:'google.com'}};
  const admin=environment.authenticatedContext('google-admin',claims).firestore();
- await assertSucceeds(getDoc(doc(admin,'usageRecords/admin-test')));
+ await assertFails(getDoc(doc(admin,'usageRecords/admin-test')));
  await assertSucceeds(getDoc(doc(admin,'reportAdmins/beyle931224@gmail.com')));
- await assertSucceeds(getDocs(collection(admin,'usageRecords')));
+ await assertFails(getDocs(collection(admin,'usageRecords')));
  await assertFails(getDoc(doc(environment.authenticatedContext('other-google',{...claims,email:'other@example.com'}).firestore(),'usageRecords/admin-test')));
  await assertFails(getDoc(doc(environment.authenticatedContext('unverified',{...claims,email_verified:false}).firestore(),'usageRecords/admin-test')));
  await assertFails(getDoc(doc(environment.authenticatedContext('anonymous',{...claims,firebase:{sign_in_provider:'anonymous'}}).firestore(),'usageRecords/admin-test')));
  await assertFails(setDoc(doc(admin,'reportAdmins/other@example.com'),{enabled:true}));
+});
+
+test('password staff UID grants reports; typed employee number cannot grant access',async()=>{
+ await environment.withSecurityRulesDisabled(async c=>{await setDoc(doc(c.firestore(),'staffAdmins/staff-a'),{enabled:true,employeeNumber:'1115034'});await setDoc(doc(c.firestore(),'staffAdmins/disabled'),{enabled:false,employeeNumber:'1107054'});await setDoc(doc(c.firestore(),'usageRecords/private'),{ip:'203.0.113.9'});});
+ const claims={firebase:{sign_in_provider:'password'}};
+ const admin=environment.authenticatedContext('staff-a',claims).firestore();
+ await assertSucceeds(getDocs(collection(admin,'usageRecords')));await assertSucceeds(getDoc(doc(admin,'staffAdmins/staff-a')));await assertFails(setDoc(doc(admin,'staffAdmins/staff-a'),{enabled:true,employeeNumber:'1107054'}));
+ for(const [uid,token] of [['staff-a',{firebase:{sign_in_provider:'anonymous'}}],['disabled',claims],['outsider',{...claims,employeeNumber:'1115034'}]])await assertFails(getDoc(doc(environment.authenticatedContext(uid,token).firestore(),'usageRecords/private')));
 });
