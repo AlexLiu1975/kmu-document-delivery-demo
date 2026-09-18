@@ -28,7 +28,7 @@ test('unavailable IP does not prevent login or successful document mutation',asy
 });
 
 test('staff password login validates UID authorization and can restore session',async()=>{
- const {store}=adapter();await settle();await assert.rejects(()=>store.login('1115034'),/密碼/);await assert.rejects(()=>store.login('1115034','wrong'),/錯誤/);await store.login('1115034','fixture-password-123');assert.equal((await store.staffSession()).employeeNumber,'1115034');await assert.rejects(()=>store.changePassword('short'),/12/);await store.changePassword('fixture-password-456');await store.logout();assert.equal(await store.staffSession(),null);
+ const {store}=adapter();await settle();await assert.rejects(()=>store.login('1115034'),/密碼/);await assert.rejects(()=>store.login('1115034','wrong'),/錯誤/);await store.login('1115034','fixture-password-123');assert.equal((await store.staffSession()).employeeNumber,'1115034');await assert.rejects(()=>store.changePassword('1234567'),/8/);await store.changePassword('Abcd1234');await store.logout();assert.equal(await store.staffSession(),null);
 });
 test('password login cannot grant access without protected staff UID authorization',async()=>{
  const {store}=adapter(false,false);await settle();await assert.rejects(()=>store.login('1115034','fixture-password-123'),/尚未啟用/);assert.equal(await store.staffSession(),null);

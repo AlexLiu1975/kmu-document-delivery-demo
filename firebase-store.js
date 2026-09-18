@@ -131,7 +131,7 @@ async function login(value,password) {
 
 async function changePassword(password) {
   if(!await staffSession()) throw Error('請先登入管理職號。');
-  if(String(password).length<12) throw Error('新密碼至少需要12個字元。');
+  if(String(password).length<8) throw Error('新密碼至少需要8個字元。');
   await updatePassword(auth,password);
 }
 async function logout() {

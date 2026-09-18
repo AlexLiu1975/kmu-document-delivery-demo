@@ -62,4 +62,4 @@ npm run report:usage -- 90
 
 管理者使用 Firebase Authentication Email/Password 帳號，內部帳號地址為 {職號}@staff.kmu-document-delivery.invalid，介面只要求職號與密碼。啟用 Email/Password 後由專案管理者建立帳號，將 UID 登記在 staffAdmins/{UID}，欄位 enabled:true、employeeNumber:管理職號。瀏覽器不能建立或修改此授權名單；只有 password 登入且 UID 名單啟用者能讀取 usageRecords。原 Google 報表授權不再授予紀錄讀取權限。
 
-登入狀態存在同分頁 sessionStorage，閒置10分鐘自動登出；登入後可在頁首「修改管理密碼」設定至少12字元的新密碼。忘記密碼時請聯絡專案管理者重設。初始密碼不得提交 GitHub 或放在公開網站。
+登入狀態存在同分頁 sessionStorage，閒置10分鐘自動登出；登入後可在頁首「修改管理密碼」設定至少8字元的新密碼。忘記密碼時請聯絡專案管理者重設。初始密碼不得提交 GitHub 或放在公開網站。
