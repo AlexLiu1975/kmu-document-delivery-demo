@@ -766,6 +766,7 @@
         byId('query-number').value = queriedNumber;
         renderQuery();
         activate('query');
+        if (firebaseStore && firebaseStore.recordUsage) void firebaseStore.recordUsage('QUERY', queriedNumber);
       } else {
         await runRegisterReceived(button.dataset.documentNumber);
       }
@@ -787,6 +788,7 @@
     try {
       queriedNumber = normalizeIndexDocumentNumber(byId('query-number').value);
       renderQuery();
+      if (firebaseStore && firebaseStore.recordUsage) void firebaseStore.recordUsage('QUERY', queriedNumber, findDocument(queriedNumber) ? 'success' : 'not_found');
     } catch (error) { notify(error.message, true); }
   });
 
@@ -817,6 +819,10 @@
 
   byId('cancel-reject').addEventListener('click', function () { byId('reject-dialog').close(); });
 
+  window.addEventListener('usage-record-status', function(event) {
+    var badge = byId('usage-status');
+    if (badge) badge.textContent = event.detail === 'synced' ? '使用紀錄已同步' : '使用紀錄尚未同步';
+  });
   renderAll();
   function connectFirebaseStore() {
     firebaseStore = window.firebaseDocumentStore;

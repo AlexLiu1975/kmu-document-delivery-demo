@@ -203,3 +203,24 @@ test('P cannot be archived and unknown status codes are denied', async () => {
   await assertSucceeds(setDoc(ref, documentData({status:'P'})));
   await assertFails(updateDoc(ref,{status:'A',revision:2}));
 });
+
+test('usage records bind UID, preserve full IP and deny browser reads/updates/deletes', async () => {
+ const {serverTimestamp} = require('firebase/firestore');
+ const db = environment.authenticatedContext('uid-a').firestore();
+ const ref = doc(db,'usageRecords/record-a');
+ const data={employeeNumber:'1115034',documentNumber:'1151103143',ip:'203.0.113.7',ipStatus:'available',visitorId:'v1',sessionId:'s1',authUid:'uid-a',action:'RECEIVE',result:'success',errorCode:'',occurredAt:serverTimestamp()};
+ await assertSucceeds(setDoc(ref,data));
+ await assertFails(getDoc(ref));
+ await assertFails(getDoc(doc(environment.authenticatedContext('other-user').firestore(),'usageRecords/record-a')));
+ await assertFails(updateDoc(ref,{ip:'203.0.113.8'}));
+ await assertFails(deleteDoc(ref));
+ await assertFails(setDoc(doc(db,'usageRecords/forged'),{...data,authUid:'other-user'}));
+ await assertFails(setDoc(doc(db,'usageRecords/invalid'),{...data,employeeNumber:'123'}));
+});
+
+test('anonymous page views and unavailable IP are valid, unauthenticated telemetry is denied', async () => {
+ const {serverTimestamp}=require('firebase/firestore');
+ const data={employeeNumber:'',documentNumber:'',ip:'',ipStatus:'unavailable',visitorId:'v1',sessionId:'s1',authUid:'uid-a',action:'PAGE_VIEW',result:'success',errorCode:'',occurredAt:serverTimestamp()};
+ await assertSucceeds(setDoc(doc(environment.authenticatedContext('uid-a').firestore(),'usageRecords/view-a'),data));
+ await assertFails(setDoc(doc(environment.unauthenticatedContext().firestore(),'usageRecords/view-b'),data));
+});

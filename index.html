@@ -40,6 +40,7 @@
       <strong>安全提醒：</strong>請勿輸入真實公文文號或個人資料。本頁只用於操作流程測試。
       <span id="connection-status" class="connection-status" data-state="connecting">Firebase 連線中</span>
     </section>
+    <section class="info">本站記錄登入與操作時間、輸入職號、相關文號及完整對外 IP，供管理者分析使用情況。IP 由 ipify 查詢；取得失敗仍可使用網站。<span id="usage-status">使用紀錄同步中</span></section>
     <nav class="tabs" role="tablist" aria-label="主要功能">
       <button class="tab active" role="tab" aria-selected="true" data-panel="deliver">收文登記</button>
       <button class="tab" role="tab" aria-selected="false" data-panel="query">進度查詢</button>
@@ -185,6 +186,7 @@
     </form>
   </dialog>
   <div id="toast" class="toast" aria-live="polite"></div>
+  <script src="usage-core.js"></script>
   <script src="status.js"></script>
   <script src="firebase-store-core.js"></script>
   <script type="module" src="firebase-store.js"></script>

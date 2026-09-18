@@ -37,3 +37,21 @@ firebase deploy --only firestore:rules --project kmu-document-delivery
 ```
 
 確認部署成功後再將修正分支合併到 GitHub Pages 使用的分支。本次提交不會修改既有公文資料，也不會自動修正歷史上狀態與退文事件不一致的紀錄；這類資料須先比對完整歷程，避免覆蓋後來的再次收文。
+
+## 使用紀錄與私密報表
+
+啟用後，`usageRecords` 保存頁面造訪、成功登入、查詢、收文／退文／歸檔成功與失敗，包括完整對外 IP、輸入職號、相關文號、UID、訪客代碼、工作階段與伺服器時間。未登入／尚未操作時職號或文號為空。IP 透過 api64.ipify.org 查詢，逾時或服務中斷記為 unavailable，不阻擋公文操作。流量紀錄寫入失敗也不使公文操作失敗，頁面會顯示紀錄同步狀態。
+
+訪客代碼保存在 localStorage，工作階段代碼保存在 sessionStorage；它們用於區分瀏覽器與同一分頁的工作階段，並非本人身分。頁面造訪為了寫入紀錄也會建立匿名 Firebase 帳號，因此 Authentication 帳號數不能視為實際人數。職號自行輸入、IP 由瀏覽器查詢，皆可能偽造；IP 也可能多人共用，這些紀錄僅供使用分析，不能作為身分驗證或正式稽核證據。
+
+所有瀏覽器帳號都禁止讀取、更新或刪除 `usageRecords`。具備 Firebase 專案 IAM 權限的管理者可在 Firestore 主控台查看，或先 `firebase login` 再執行：
+
+```sh
+npm run report:usage
+# 例如最近 90 天：
+npm run report:usage -- 90
+```
+
+報表產生於 `.reports/usage-report.html`，含依職號使用天數、登入／查詢／公文操作次數、失敗數、最近使用時間與每日統計。`.reports/usage-records.csv` 包含完整紀錄與 IP。資料使用臺灣時區彙整，預設讀取最近 30 天。報表在本機產生，已排除版本控制；請勿放到公開網站或提交 GitHub。此工具使用已固定版本的 Firebase CLI 授權介面，不需將金鑰放入前端。
+
+只涵蓋啟用後成功同步的紀錄，歷史 IP 無法補回，封鎖追蹤或離線可能少計。紀錄目前不自動刪除；管理者可在主控台依機關保存政策清理。每次造訪與操作各增加一次 Firestore 寫入，仍受 Spark 配額限制。先部署新 firestore.rules，再發布前端。

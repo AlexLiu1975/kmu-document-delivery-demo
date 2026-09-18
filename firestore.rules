@@ -136,6 +136,26 @@ service cloud.firestore {
       }
     }
 
+    // These records contain employee numbers and full IPs. Read through project IAM only.
+    match /usageRecords/{recordId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll(['employeeNumber','documentNumber','ip','ipStatus','visitorId','sessionId','authUid','action','result','errorCode','occurredAt'])
+        && request.resource.data.keys().hasOnly(['employeeNumber','documentNumber','ip','ipStatus','visitorId','sessionId','authUid','action','result','errorCode','occurredAt'])
+        && request.resource.data.authUid == request.auth.uid
+        && validOptionalEmployeeNumber(request.resource.data.employeeNumber)
+        && (request.resource.data.documentNumber == '' || validDocumentNumber(request.resource.data.documentNumber))
+        && request.resource.data.ip is string && request.resource.data.ip.size() <= 64
+        && ((request.resource.data.ipStatus == 'unavailable' && request.resource.data.ip == '')
+          || (request.resource.data.ipStatus == 'available' && request.resource.data.ip.size() > 0))
+        && request.resource.data.visitorId is string && request.resource.data.visitorId.size() > 0 && request.resource.data.visitorId.size() <= 100
+        && request.resource.data.sessionId is string && request.resource.data.sessionId.size() > 0 && request.resource.data.sessionId.size() <= 100
+        && request.resource.data.action in ['PAGE_VIEW','LOGIN','QUERY','RECEIVE','REJECT','ARCHIVE']
+        && request.resource.data.result in ['success','not_found','failure']
+        && request.resource.data.errorCode is string && request.resource.data.errorCode.size() <= 100
+        && request.resource.data.occurredAt == request.time;
+      allow read, update, delete: if false;
+    }
+
     match /{path=**}/events/{eventId} {
       allow read: if signedIn();
     }
