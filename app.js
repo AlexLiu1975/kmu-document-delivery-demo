@@ -69,6 +69,13 @@
     return roleName === 'staff' && STAFF_EMPLOYEE_NUMBERS.indexOf(String(employeeNumber || '').trim()) >= 0;
   }
 
+  function allowedPanels(roleName, employeeNumber) {
+    if (!String(employeeNumber || '').trim()) return ['deliver'];
+    return canAccessStaff(roleName, employeeNumber)
+      ? ['deliver', 'query', 'manage', 'history']
+      : ['query'];
+  }
+
   function nextStatus(fromStatus, action) { return statusModel.next(fromStatus, action); }
 
   function statusLabel(status) { return statusModel.label(status); }
@@ -257,6 +264,7 @@
     formatCountdown: formatCountdown,
     canSwitchRole: canSwitchRole,
     canAccessStaff: canAccessStaff,
+    allowedPanels: allowedPanels,
     nextStatus: nextStatus,
     validateRejectionReason: validateRejectionReason,
     deliver: deliver,
@@ -365,7 +373,7 @@
     body.appendChild(row);
     table.appendChild(body);
     wrap.appendChild(table);
-    if (currentAssignee && ['P', 'B'].indexOf(statusModel.normalize(record.status)) >= 0) {
+    if (canAccessStaff(role, currentAssignee) && ['P', 'B'].indexOf(statusModel.normalize(record.status)) >= 0) {
       wrap.appendChild(actionButton('收文', 'primary', async function () {
         try { await runRegisterReceived(record.documentNumber); }
         catch (error) { notify(firebaseErrorMessage(error), true); }
@@ -444,6 +452,7 @@
 
   async function logoutAssignee(isAutomatic) {
     currentAssignee = '';
+    role = 'general';
     if (sessionTimer) window.clearTimeout(sessionTimer);
     if (sessionInterval) window.clearInterval(sessionInterval);
     sessionTimer = null;
@@ -454,6 +463,10 @@
       unsubscribeFirebase = null;
     }
     state = emptyState();
+    queriedNumber = '';
+    lastReceivedNumber = '';
+    byId('query-number').value = '';
+    clear(byId('query-result'));
     byId('assignee').value = '';
     byId('staff-password').value = '';
     byId('staff-password').hidden = true;
@@ -502,12 +515,16 @@
     setConnectionStatus('connecting', 'Firebase 登入中');
     await firebaseStore.login(employeeNumber, byId('staff-password').value);
     byId('staff-password').value = '';
-    if (STAFF_EMPLOYEE_NUMBERS.indexOf(employeeNumber) >= 0) role = 'staff';
+    var requestedStaffAccess = role === 'staff';
+    role = STAFF_EMPLOYEE_NUMBERS.indexOf(employeeNumber) >= 0 ? 'staff' : 'general';
     currentAssignee = employeeNumber;
-    startFirebaseSubscription();
+    if (canAccessStaff(role, currentAssignee)) startFirebaseSubscription();
+    else {
+      state = emptyState();
+      setConnectionStatus('ready', '已登入，可查詢公文進度');
+    }
     resetSessionTimer();
-    var deniedStaffAccess = role === 'staff' && !canAccessStaff(role, currentAssignee);
-    if (deniedStaffAccess) role = 'general';
+    var deniedStaffAccess = requestedStaffAccess && !canAccessStaff(role, currentAssignee);
     renderAll();
     notify('職號 ' + currentAssignee + ' 已登入 Firebase 測試資料。');
     if (deniedStaffAccess) notify('此職號沒有事務組權限，已切換為一般人員。', true);
@@ -520,7 +537,7 @@
   }
 
   async function runRegisterReceived(number) {
-    if (!currentAssignee) throw new Error('請先輸入職號並登入。');
+    if (!canAccessStaff(role, currentAssignee)) throw new Error('只有事務組管理者可以登記收文。');
     var normalized = normalizeIndexDocumentNumber(number);
     lastReceivedNumber = normalized;
     await firebaseStore.receive(normalized, currentAssignee);
@@ -665,10 +682,17 @@
     byId('role-label').textContent = role === 'staff' ? '事務組測試人員' : '一般測試人員';
     byId('role-toggle').disabled = !canSwitchRole(currentAssignee);
     byId('role-toggle').title = currentAssignee ? '請先登出目前職號' : '';
-    byId('tab-manage').hidden = !staffAccess;
+    var panels = allowedPanels(role, currentAssignee);
+    document.querySelectorAll('.tab').forEach(function (tab) {
+      var enabled = panels.indexOf(tab.dataset.panel) >= 0;
+      tab.disabled = !enabled;
+      tab.setAttribute('aria-disabled', String(!enabled));
+    });
+    byId('tab-manage').hidden = false;
     byId('usage-report-button').hidden = !staffAccess;
     byId('staff-password-change').hidden = !staffAccess;
-    if (!staffAccess && byId('panel-manage').classList.contains('active')) activate('deliver');
+    var activePanel = document.querySelector('.panel.active');
+    if (!activePanel || panels.indexOf(activePanel.id.replace('panel-', '')) < 0) activate(panels[0]);
     renderManage();
     renderHistory();
     renderInputMode();
@@ -679,6 +703,7 @@
   }
 
   function activate(name) {
+    if (allowedPanels(role, currentAssignee).indexOf(name) < 0) return;
     document.querySelectorAll('.tab').forEach(function (tab) {
       tab.classList.toggle('active', tab.dataset.panel === name);
       tab.setAttribute('aria-selected', String(tab.dataset.panel === name));
@@ -791,13 +816,20 @@
     var record = findDocument(queriedNumber);
     result.appendChild(record ? recordCard(record) : el('p', 'empty', '查無此文號資料。'));
   }
-  byId('query-form').addEventListener('submit', function (event) {
+  byId('query-form').addEventListener('submit', async function (event) {
     event.preventDefault();
     try {
       queriedNumber = normalizeIndexDocumentNumber(byId('query-number').value);
-      renderQuery();
-      if (firebaseStore && firebaseStore.recordUsage) void firebaseStore.recordUsage('QUERY', queriedNumber, findDocument(queriedNumber) ? 'success' : 'not_found');
-    } catch (error) { notify(error.message, true); }
+      if (canAccessStaff(role, currentAssignee)) {
+        renderQuery();
+        if (firebaseStore && firebaseStore.recordUsage) void firebaseStore.recordUsage('QUERY', queriedNumber, findDocument(queriedNumber) ? 'success' : 'not_found');
+      } else {
+        var record = await firebaseStore.queryDocument(queriedNumber);
+        state.documents = state.documents.filter(function (item) { return item.documentNumber !== queriedNumber; });
+        if (record) state.documents.push(record);
+        renderQuery();
+      }
+    } catch (error) { notify(firebaseErrorMessage(error), true); }
   });
 
   byId('reason').addEventListener('change', function () {

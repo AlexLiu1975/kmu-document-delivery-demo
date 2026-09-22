@@ -176,6 +176,20 @@ async function mutate(documentNumber, actor, operation, reason) {
   }
 }
 
+async function queryDocument(number) {
+  requireSession(employeeNumber);
+  const normalized = core.validateDocumentNumber(number);
+  try {
+    const snapshot = await getDoc(doc(database, 'documents', normalized));
+    const record = snapshot.exists() ? normalizeSnapshotData(snapshot.data()) : null;
+    void recordUsage('QUERY', normalized, record ? 'success' : 'not_found');
+    return record;
+  } catch (error) {
+    void recordUsage('QUERY', normalized, 'failure', error.code || 'query-failed');
+    throw error;
+  }
+}
+
 function subscribe(onData, onError) {
   let documents = [];
   let history = [];
@@ -209,6 +223,7 @@ window.firebaseDocumentStore = {
   changePassword,
   login,
   logout,
+  queryDocument,
   subscribe,
   receive: (number, actor) => mutate(number, actor, 'RECEIVE', ''),
   reject: (number, actor, reason) => mutate(number, actor, 'REJECT', reason),

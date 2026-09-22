@@ -169,6 +169,12 @@ test('groups document events into one complete workflow row', () => {
   assert.equal(grouped[0].lastAt, 'T4');
 });
 
+test('limits a signed-in non-administrator to progress query only', () => {
+  assert.deepEqual(app.allowedPanels('general', ''), ['deliver']);
+  assert.deepEqual(app.allowedPanels('general', '1234567'), ['query']);
+  assert.deepEqual(app.allowedPanels('staff', '1115034'), ['deliver', 'query', 'manage', 'history']);
+});
+
 test('places logout and countdown in the global header', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const header = html.match(/<header>[\s\S]*?<\/header>/)[0];

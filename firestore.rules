@@ -18,6 +18,19 @@ service cloud.firestore {
       return value in ['1107054', '1115034'];
     }
 
+    function staffSession() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'password'
+        && exists(/databases/$(database)/documents/staffAdmins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/staffAdmins/$(request.auth.uid)).data.enabled == true
+        && isStaffEmployee(get(/databases/$(database)/documents/staffAdmins/$(request.auth.uid)).data.employeeNumber);
+    }
+
+    function staffSessionFor(employeeNumber) {
+      return staffSession()
+        && get(/databases/$(database)/documents/staffAdmins/$(request.auth.uid)).data.employeeNumber == employeeNumber;
+    }
+
     function validOptionalEmployeeNumber(value) {
       return value == '' || validEmployeeNumber(value);
     }
@@ -114,14 +127,15 @@ service cloud.firestore {
     }
 
     match /documents/{documentNumber} {
-      allow read: if signedIn();
-      allow create: if signedIn()
+      allow get: if signedIn();
+      allow list: if staffSession();
+      allow create: if staffSessionFor(request.resource.data.assignee)
         && validDocument(request.resource.data, documentNumber)
         && statusCode(request.resource.data.status) in ['P', 'R']
         && request.resource.data.revision == 1
         && request.resource.data.latestRejectionReason == ''
         && request.resource.data.latestRejectionActor == '';
-      allow update: if signedIn()
+      allow update: if staffSession()
         && validDocument(request.resource.data, documentNumber)
         && immutableDocumentFields()
         && validTransition(resource.data.status, request.resource.data.status)
@@ -129,19 +143,15 @@ service cloud.firestore {
       allow delete: if false;
 
       match /events/{eventId} {
-        allow read: if signedIn();
-        allow create: if signedIn()
+        allow read: if staffSession();
+        allow create: if staffSessionFor(request.resource.data.actor)
           && validEvent(request.resource.data, documentNumber);
         allow update, delete: if false;
       }
     }
 
     function staffReportAdmin() {
-      return signedIn()
-        && request.auth.token.firebase.sign_in_provider == 'password'
-        && exists(/databases/$(database)/documents/staffAdmins/$(request.auth.uid))
-        && get(/databases/$(database)/documents/staffAdmins/$(request.auth.uid)).data.enabled == true
-        && isStaffEmployee(get(/databases/$(database)/documents/staffAdmins/$(request.auth.uid)).data.employeeNumber);
+      return staffSession();
     }
     match /staffAdmins/{uid} {
       allow get: if staffReportAdmin() && request.auth.uid == uid;
@@ -181,7 +191,7 @@ service cloud.firestore {
     }
 
     match /{path=**}/events/{eventId} {
-      allow read: if signedIn();
+      allow read: if staffSession();
     }
   }
 }

@@ -55,6 +55,10 @@ function eventData(uid, overrides = {}) {
   };
 }
 
+function staffDb(uid = 'uid-a') {
+  return environment.authenticatedContext(uid, { firebase: { sign_in_provider: 'password' } }).firestore();
+}
+
 test.before(async () => {
   environment = await initializeTestEnvironment({
     projectId: 'demo-kmu-document-delivery',
@@ -70,6 +74,9 @@ test.after(async () => {
 
 test.beforeEach(async () => {
   await environment.clearFirestore();
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'staffAdmins/uid-a'), { enabled: true, employeeNumber: '1115034' });
+  });
 });
 
 test('denies unauthenticated document reads and writes', async () => {
@@ -78,13 +85,36 @@ test('denies unauthenticated document reads and writes', async () => {
   await assertFails(setDoc(doc(db, 'documents/1151100016'), documentData()));
 });
 
-test('allows an authenticated user to create a valid received document', async () => {
-  const db = environment.authenticatedContext('uid-a').firestore();
+test('allows an authorized staff user to create a valid received document', async () => {
+  const db = staffDb();
   await assertSucceeds(setDoc(doc(db, 'documents/1151100016'), documentData()));
 });
 
+test('only an authorized staff password account can create documents', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'staffAdmins/staff-writer'), { enabled: true, employeeNumber: '1115034' });
+  });
+  const passwordClaims = { firebase: { sign_in_provider: 'password' } };
+  const staff = environment.authenticatedContext('staff-writer', passwordClaims).firestore();
+  const general = environment.authenticatedContext('general-user').firestore();
+  await assertSucceeds(setDoc(doc(staff, 'documents/1151100016'), documentData()));
+  await assertFails(setDoc(doc(general, 'documents/1151100017'), documentData({ documentNumber: '1151100017', serial: '00017' })));
+});
+
+test('general users can get one known document but cannot list documents or read history', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'documents/1151100099'), documentData({ documentNumber: '1151100099', serial: '00099' }));
+    await setDoc(doc(context.firestore(), 'documents/1151100099/events/event-1'), eventData('uid-a', { documentNumber: '1151100099' }));
+  });
+  const general = environment.authenticatedContext('general-reader').firestore();
+  await assertSucceeds(getDoc(doc(general, 'documents/1151100099')));
+  await assertFails(getDocs(collection(general, 'documents')));
+  await assertFails(getDoc(doc(general, 'documents/1151100099/events/event-1')));
+  await assertFails(getDocs(query(collectionGroup(general, 'events'))));
+});
+
 test('denies malformed employee numbers and document numbers', async () => {
-  const db = environment.authenticatedContext('uid-a').firestore();
+  const db = staffDb();
   await assertFails(setDoc(doc(db, 'documents/not-a-number'), documentData()));
   await assertFails(setDoc(
     doc(db, 'documents/1151100016'),
@@ -93,7 +123,7 @@ test('denies malformed employee numbers and document numbers', async () => {
 });
 
 test('allows the approved document status transitions', async () => {
-  const db = environment.authenticatedContext('uid-a').firestore();
+  const db = staffDb();
   const ref = doc(db, 'documents/1151100016');
   await assertSucceeds(setDoc(ref, documentData()));
   await assertSucceeds(updateDoc(ref, {
@@ -117,7 +147,7 @@ test('allows the approved document status transitions', async () => {
 });
 
 test('still allows updates to legacy documents with the old 3-digit type code and 4-digit serial', async () => {
-  const db = environment.authenticatedContext('uid-a').firestore();
+  const db = staffDb();
   const ref = doc(db, 'documents/1151100016');
   await assertSucceeds(setDoc(ref, documentData({ typeCode: '110', serial: '0016' })));
   await assertSucceeds(updateDoc(ref, {
@@ -130,7 +160,7 @@ test('still allows updates to legacy documents with the old 3-digit type code an
 });
 
 test('denies updates to archived documents and document deletion', async () => {
-  const db = environment.authenticatedContext('uid-a').firestore();
+  const db = staffDb();
   const ref = doc(db, 'documents/1151100016');
   await environment.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), 'documents/1151100016'), documentData({
@@ -147,7 +177,7 @@ test('denies updates to archived documents and document deletion', async () => {
 });
 
 test('allows event creation but denies event update and delete', async () => {
-  const db = environment.authenticatedContext('uid-a').firestore();
+  const db = staffDb();
   const ref = doc(db, 'documents/1151100016/events/event-1');
   await assertSucceeds(setDoc(ref, eventData('uid-a')));
   await assertFails(updateDoc(ref, { reason: '竄改原因' }));
@@ -165,12 +195,12 @@ test('allows authenticated collection-group reads of operation events', async ()
       eventData('uid-a')
     );
   });
-  const db = environment.authenticatedContext('uid-a').firestore();
+  const db = staffDb();
   await assertSucceeds(getDocs(query(collectionGroup(db, 'events'))));
 });
 
 test('canonical P/R/B/A lifecycle preserves return metadata through receive and archive', async () => {
-  const db = environment.authenticatedContext('uid-a').firestore();
+  const db = staffDb();
   const ref = doc(db, 'documents/1151100016');
   const core = require('../firebase-store-core');
   const assert = require('node:assert/strict');
@@ -189,7 +219,7 @@ test('canonical P/R/B/A lifecycle preserves return metadata through receive and 
 });
 
 test('legacy Chinese document can transition to canonical B while preserving immutable numbering', async () => {
-  const db = environment.authenticatedContext('uid-a').firestore();
+  const db = staffDb();
   const ref = doc(db, 'documents/1151100016');
   await assertSucceeds(setDoc(ref, documentData()));
   const core = require('../firebase-store-core');
@@ -198,7 +228,7 @@ test('legacy Chinese document can transition to canonical B while preserving imm
 });
 
 test('P cannot be archived and unknown status codes are denied', async () => {
-  const db = environment.authenticatedContext('uid-a').firestore();
+  const db = staffDb();
   const ref = doc(db, 'documents/1151100016');
   await assertFails(setDoc(ref, documentData({status:'X'})));
   await assertSucceeds(setDoc(ref, documentData({status:'P'})));
