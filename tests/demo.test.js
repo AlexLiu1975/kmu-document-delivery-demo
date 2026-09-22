@@ -175,6 +175,14 @@ test('limits a signed-in non-administrator to progress query only', () => {
   assert.deepEqual(app.allowedPanels('staff', '1115034'), ['deliver', 'query', 'manage', 'history']);
 });
 
+test('shows a safe Chinese warning for denied document mutations', () => {
+  assert.equal(
+    app.mutationErrorMessage({ code: 'permission-denied', message: 'Missing or insufficient permissions.' }),
+    '請勿更改收發文狀態，您沒有執行此操作的權限。'
+  );
+  assert.equal(app.mutationErrorMessage({ code: 'unavailable' }), 'Firebase 目前無法連線，資料尚未同步。');
+});
+
 test('places logout and countdown in the global header', () => {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const header = html.match(/<header>[\s\S]*?<\/header>/)[0];

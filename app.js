@@ -76,6 +76,15 @@
       : ['query'];
   }
 
+  function mutationErrorMessage(error) {
+    var code = error && error.code ? String(error.code) : '';
+    if (code.indexOf('permission-denied') >= 0 ||
+        String(error && error.message || '').indexOf('Missing or insufficient permissions') >= 0) {
+      return '請勿更改收發文狀態，您沒有執行此操作的權限。';
+    }
+    return firebaseErrorMessage(error);
+  }
+
   function nextStatus(fromStatus, action) { return statusModel.next(fromStatus, action); }
 
   function statusLabel(status) { return statusModel.label(status); }
@@ -265,6 +274,7 @@
     canSwitchRole: canSwitchRole,
     canAccessStaff: canAccessStaff,
     allowedPanels: allowedPanels,
+    mutationErrorMessage: mutationErrorMessage,
     nextStatus: nextStatus,
     validateRejectionReason: validateRejectionReason,
     deliver: deliver,
@@ -376,7 +386,7 @@
     if (canAccessStaff(role, currentAssignee) && ['P', 'B'].indexOf(statusModel.normalize(record.status)) >= 0) {
       wrap.appendChild(actionButton('收文', 'primary', async function () {
         try { await runRegisterReceived(record.documentNumber); }
-        catch (error) { notify(firebaseErrorMessage(error), true); }
+        catch (error) { notify(mutationErrorMessage(error), true); }
       }));
     }
     return wrap;
@@ -595,7 +605,7 @@
       await firebaseStore.archive(documentNumber, currentAssignee);
       notify('歸檔完成。');
     } catch (error) {
-      notify(error.message, true);
+      notify(mutationErrorMessage(error), true);
     }
   }
 
@@ -739,7 +749,7 @@
       await runRegisterReceived(number);
       byId('manual-document-number').value = '';
     } catch (error) {
-      notify(error.message, true);
+      notify(mutationErrorMessage(error), true);
     }
   });
 
@@ -804,7 +814,7 @@
         await runRegisterReceived(button.dataset.documentNumber);
       }
     } catch (error) {
-      notify(error.message, true);
+      notify(mutationErrorMessage(error), true);
     }
   });
 
@@ -853,7 +863,7 @@
       renderAll();
       notify('退文完成。');
     } catch (error) {
-      notify(error.message, true);
+      notify(mutationErrorMessage(error), true);
     }
   });
 
