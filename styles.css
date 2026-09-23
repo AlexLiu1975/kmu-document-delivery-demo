@@ -93,7 +93,7 @@ textarea { min-height: 92px; resize: vertical; }
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 20px 0;
   padding: 6px; border-radius: 12px; background: #edf4f6;
 }
-.assignee-login-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.assignee-login-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; }
 .assignee-session {
   display: flex; align-items: center; justify-content: flex-end; gap: 10px;
   margin-top: 10px; padding: 9px 10px; border: 1px solid #86c5a0;
