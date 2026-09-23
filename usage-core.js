@@ -24,7 +24,7 @@
    if(r.result==='success'){if(r.action==='RECEIVE')e.received++;if(r.action==='REJECT')e.returned++;if(r.action==='ARCHIVE')e.archived++;}
    if(r.result==='failure')e.failures++;if(String(r.occurredAt)>e.lastUsed)e.lastUsed=String(r.occurredAt);
   });
-  return {returningVisitors:Object.values(visitorSessions).filter(function(s){return s.size>1;}).length,visitors:visitors.size,sessions:sessions.size,records:rows.length,daily:Object.values(daily).sort(function(a,b){return a.date.localeCompare(b.date);}),employees:Object.values(employees).map(function(e){e.activeDays=e.days.size;delete e.days;return e;}).sort(function(a,b){return b.activeDays-a.activeDays||(b.queries+b.received+b.returned+b.archived)-(a.queries+a.received+a.returned+a.archived);})};
+  return {returningVisitors:Object.values(visitorSessions).filter(function(s){return s.size>1;}).length,visitors:visitors.size,sessions:sessions.size,records:rows.length,daily:Object.values(daily).sort(function(a,b){return b.date.localeCompare(a.date);}),employees:Object.values(employees).map(function(e){e.activeDays=e.days.size;delete e.days;return e;}).sort(function(a,b){return b.activeDays-a.activeDays||(b.queries+b.received+b.returned+b.archived)-(a.queries+a.received+a.returned+a.archived);})};
  }
  return {normalizeIp:normalizeIp,buildRecord:buildRecord,summarize:summarize};
 });

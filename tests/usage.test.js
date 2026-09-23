@@ -21,3 +21,11 @@ test('report groups repeat anonymous identities by employee and computes meaning
  const report=usage.summarize(rows);
  assert.equal(report.employees.length,1);assert.equal(report.employees[0].activeDays,2);assert.equal(report.employees[0].logins,2);assert.equal(report.employees[0].received,1);assert.equal(report.employees[0].queries,1);assert.equal(report.employees[0].failures,1);assert.equal(report.visitors,1);assert.equal(report.sessions,2);assert.equal(report.returningVisitors,1);
 });
+test('daily usage lists the most recent date first',()=>{
+ const report=usage.summarize([
+  {action:'PAGE_VIEW',result:'success',occurredAt:'2026-09-18T02:00:00Z'},
+  {action:'PAGE_VIEW',result:'success',occurredAt:'2026-09-23T02:00:00Z'},
+  {action:'PAGE_VIEW',result:'success',occurredAt:'2026-09-21T02:00:00Z'}
+ ]);
+ assert.deepEqual(report.daily.map(row=>row.date),['2026-09-23','2026-09-21','2026-09-18']);
+});
