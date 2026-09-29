@@ -8,7 +8,7 @@
   var statusModel = typeof module === 'object' && module.exports ? require('./status.js') : window.DocumentStatus;
   var STORAGE_KEY = 'kmu-document-delivery-demo-v1';
   var SESSION_TIMEOUT_MS = 600000;
-  var REASONS = ['缺少發文日期', '缺少已用印信章', '缺少監印章', '缺少校對章', '其它'];
+  var REASONS = ['缺少發文日期', '缺少已用印信章', '缺少監印章', '缺少校對章', '補蓋決行章', '其它'];
   var STATUS = { DELIVERED: 'P', RECEIVED: 'R', REJECTED: 'B', ARCHIVED: 'A' };
   var STAFF_EMPLOYEE_NUMBERS = ['1107054', '1115034'];
 

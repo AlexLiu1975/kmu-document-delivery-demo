@@ -26,6 +26,7 @@ test('supports the approved workflow only', () => {
 
 test('validates the fixed rejection reasons', () => {
   assert.equal(app.validateRejectionReason('缺少發文日期', ''), '缺少發文日期');
+  assert.equal(app.validateRejectionReason('補蓋決行章', ''), '補蓋決行章');
   assert.equal(app.validateRejectionReason('其它', '附件錯誤'), '其它：附件錯誤');
   assert.throws(() => app.validateRejectionReason('其它', ''));
   assert.throws(() => app.validateRejectionReason('未核准選項', ''));
@@ -220,6 +221,7 @@ test('uses Firebase as the only shared data source', () => {
   assert.match(html, /<option>缺少已用印信章<\/option>/);
   assert.match(html, /<option>缺少監印章<\/option>/);
   assert.match(html, /<option>缺少校對章<\/option>/);
+  assert.match(html, /<option>補蓋決行章<\/option>/);
   assert.match(html, /<option value="其它">其它：<\/option>/);
   assert.doesNotMatch(html, /google\.script\.run/);
   assert.doesNotMatch(html, /@kmu\.edu\.tw/);
