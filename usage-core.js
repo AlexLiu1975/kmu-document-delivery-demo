@@ -11,20 +11,28 @@
  }
  function day(value){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));}
  function summarize(rows){
-  var visitors=new Set(),sessions=new Set(),employees={},daily={},visitorSessions={};
+  var visitors=new Set(),sessions=new Set(),employees={},daily={},visitorSessions={},receiptDates={};
   rows.forEach(function(r){
    if(r.visitorId){visitors.add(r.visitorId);if(!visitorSessions[r.visitorId])visitorSessions[r.visitorId]=new Set();if(r.sessionId)visitorSessions[r.visitorId].add(r.sessionId);}if(r.sessionId)sessions.add(r.sessionId);
    var d=day(r.occurredAt);if(!daily[d])daily[d]={date:d,views:0,logins:0,operations:0,failures:0};
    if(r.action==='PAGE_VIEW')daily[d].views++;if(r.action==='LOGIN'&&r.result==='success')daily[d].logins++;
    if(['RECEIVE','REJECT','ARCHIVE'].indexOf(r.action)>=0&&r.result==='success')daily[d].operations++;
    if(r.result==='failure')daily[d].failures++;
+   if(r.action==='RECEIVE'&&r.result==='success'&&/^\d{10}$/.test(String(r.documentNumber||''))){
+    var number=String(r.documentNumber);if(!receiptDates[number]||d<receiptDates[number])receiptDates[number]=d;
+   }
    if(!r.employeeNumber)return;
    var e=employees[r.employeeNumber]||(employees[r.employeeNumber]={employeeNumber:r.employeeNumber,days:new Set(),logins:0,queries:0,received:0,returned:0,archived:0,failures:0,lastUsed:''});
    e.days.add(d);if(r.action==='LOGIN'&&r.result==='success')e.logins++;if(r.action==='QUERY')e.queries++;
    if(r.result==='success'){if(r.action==='RECEIVE')e.received++;if(r.action==='REJECT')e.returned++;if(r.action==='ARCHIVE')e.archived++;}
    if(r.result==='failure')e.failures++;if(String(r.occurredAt)>e.lastUsed)e.lastUsed=String(r.occurredAt);
   });
-  return {returningVisitors:Object.values(visitorSessions).filter(function(s){return s.size>1;}).length,visitors:visitors.size,sessions:sessions.size,records:rows.length,daily:Object.values(daily).sort(function(a,b){return b.date.localeCompare(a.date);}),employees:Object.values(employees).map(function(e){e.activeDays=e.days.size;delete e.days;return e;}).sort(function(a,b){return b.activeDays-a.activeDays||(b.queries+b.received+b.returned+b.archived)-(a.queries+a.received+a.returned+a.archived);})};
+  var dailyReceipts={};Object.keys(receiptDates).forEach(function(number){
+   var code=number.slice(3,5);if(code!=='11'&&code!=='00')return;var receiptDay=receiptDates[number];
+   var receipt=dailyReceipts[receiptDay]||(dailyReceipts[receiptDay]={date:receiptDay,draft:0,received:0,total:0});
+   if(code==='11')receipt.draft++;else receipt.received++;receipt.total++;
+  });
+  return {returningVisitors:Object.values(visitorSessions).filter(function(s){return s.size>1;}).length,visitors:visitors.size,sessions:sessions.size,records:rows.length,daily:Object.values(daily).sort(function(a,b){return b.date.localeCompare(a.date);}),dailyReceipts:Object.values(dailyReceipts).sort(function(a,b){return b.date.localeCompare(a.date);}),employees:Object.values(employees).map(function(e){e.activeDays=e.days.size;delete e.days;return e;}).sort(function(a,b){return b.activeDays-a.activeDays||(b.queries+b.received+b.returned+b.archived)-(a.queries+a.received+a.returned+a.archived);})};
  }
  return {normalizeIp:normalizeIp,buildRecord:buildRecord,summarize:summarize};
 });

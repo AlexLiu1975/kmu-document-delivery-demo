@@ -29,3 +29,29 @@ test('daily usage lists the most recent date first',()=>{
  ]);
  assert.deepEqual(report.daily.map(row=>row.date),['2026-09-23','2026-09-21','2026-09-18']);
 });
+test('daily receipt totals split draft and received documents without duplicate document numbers',()=>{
+ const report=usage.summarize([
+  {action:'RECEIVE',documentNumber:'1151100001',result:'success',occurredAt:'2026-09-22T02:00:00Z'},
+  {action:'RECEIVE',documentNumber:'1150000002',result:'success',occurredAt:'2026-09-23T02:00:00Z'},
+  {action:'RECEIVE',documentNumber:'1151100001',result:'success',occurredAt:'2026-09-24T02:00:00Z'},
+  {action:'RECEIVE',documentNumber:'1150000003',result:'failure',occurredAt:'2026-09-24T03:00:00Z'},
+  {action:'ARCHIVE',documentNumber:'1151100004',result:'success',occurredAt:'2026-09-24T04:00:00Z'}
+ ]);
+ assert.deepEqual(report.dailyReceipts,[
+  {date:'2026-09-23',draft:0,received:1,total:1},
+  {date:'2026-09-22',draft:1,received:0,total:1}
+ ]);
+});
+test('online and generated reports render the daily receipt breakdown',()=>{
+ const fs=require('node:fs');
+ const path=require('node:path');
+ const root=path.join(__dirname,'..');
+ const html=fs.readFileSync(path.join(root,'usage-report.html'),'utf8');
+ const browser=fs.readFileSync(path.join(root,'admin-report.js'),'utf8');
+ const generated=fs.readFileSync(path.join(root,'scripts/usage-report.cjs'),'utf8');
+ assert.match(html,/每日收文數量/);
+ assert.match(html,/id="receipt-table"/);
+ assert.match(browser,/\['date','draft','received','total'\]/);
+ assert.match(browser,/\['日期','創稿','收文','合計'\]/);
+ assert.match(generated,/report\.dailyReceipts/);
+});
