@@ -267,6 +267,7 @@
     emptyState: emptyState,
     statusLabel: statusLabel,
     statusClass: statusClass,
+    shouldReceiveFromMatrix: shouldReceiveFromMatrix,
     normalizeDocumentNumber: normalizeDocumentNumber,
     buildDocumentNumber: buildDocumentNumber,
     normalizeIndexDocumentNumber: normalizeIndexDocumentNumber,
@@ -400,6 +401,10 @@
 
   function findDocument(number) {
     return state.documents.find(function (item) { return item.documentNumber === number; });
+  }
+
+  function shouldReceiveFromMatrix(record, isStaff) {
+    return !record || (isStaff && statusModel.normalize(record.status) === STATUS.REJECTED);
   }
 
   function indexStatusClass(number) {
@@ -804,7 +809,7 @@
     if (!button) return;
     try {
       var existing = findDocument(button.dataset.documentNumber);
-      if (existing) {
+      if (existing && !shouldReceiveFromMatrix(existing, canAccessStaff(role, currentAssignee))) {
         queriedNumber = existing.documentNumber;
         byId('query-number').value = queriedNumber;
         renderQuery();
