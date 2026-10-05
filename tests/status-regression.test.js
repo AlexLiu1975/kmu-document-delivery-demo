@@ -50,3 +50,12 @@ test('three-digit page 107 plus selected cell 97 preserves a ten-digit number', 
   assert.equal(app.buildDocumentNumber('115', '00', 107 * 100 + 97), '1150010797');
   assert.equal(app.buildDocumentNumber('115', '11', 999 * 100 + 99), '1151199999');
 });
+
+test('returned matrix cell can be re-received by staff without creating a duplicate', () => {
+ assert.equal(app.shouldReceiveFromMatrix(null, true), true);
+ assert.equal(app.shouldReceiveFromMatrix({ status: 'B' }, true), true);
+ assert.equal(app.shouldReceiveFromMatrix({ status: '已退文' }, true), true);
+ assert.equal(app.shouldReceiveFromMatrix({ status: 'B' }, false), false);
+ assert.equal(app.shouldReceiveFromMatrix({ status: 'R' }, true), false);
+ assert.equal(app.shouldReceiveFromMatrix({ status: 'A' }, true), false);
+});
