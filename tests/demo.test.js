@@ -101,9 +101,12 @@ test('allows a rejected document to be received again', () => {
 
 test('uses a ten-minute employee session timeout', () => {
   assert.equal(app.SESSION_TIMEOUT_MS, 600_000);
+  assert.equal(app.STAFF_SESSION_TIMEOUT_MS, 28_800_000);
   assert.equal(app.formatCountdown(60), '01:00');
   assert.equal(app.formatCountdown(9), '00:09');
   assert.equal(app.formatCountdown(0), '00:00');
+  assert.equal(app.formatCountdown(28_800), '8:00:00');
+  assert.equal(app.formatCountdown(3_661), '1:01:01');
 });
 
 test('restricts staff access to the whitelisted employee numbers only', () => {

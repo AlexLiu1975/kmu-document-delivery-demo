@@ -8,6 +8,7 @@
   var statusModel = typeof module === 'object' && module.exports ? require('./status.js') : window.DocumentStatus;
   var STORAGE_KEY = 'kmu-document-delivery-demo-v1';
   var SESSION_TIMEOUT_MS = 600000;
+  var STAFF_SESSION_TIMEOUT_MS = 28800000;
   var REASONS = ['缺少發文日期', '缺少已用印信章', '缺少監印章', '缺少校對章', '補蓋決行章', '其它'];
   var STATUS = { DELIVERED: 'P', RECEIVED: 'R', REJECTED: 'B', ARCHIVED: 'A' };
   var STAFF_EMPLOYEE_NUMBERS = ['1107054', '1115034'];
@@ -56,9 +57,11 @@
 
   function formatCountdown(seconds) {
     var total = Math.max(0, Math.floor(Number(seconds) || 0));
-    var minutes = Math.floor(total / 60);
+    var hours = Math.floor(total / 3600);
+    var minutes = Math.floor((total % 3600) / 60);
     var remainder = total % 60;
-    return String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0');
+    var mmss = String(minutes).padStart(2, '0') + ':' + String(remainder).padStart(2, '0');
+    return hours > 0 ? hours + ':' + mmss : mmss;
   }
 
   function canSwitchRole(employeeNumber) {
@@ -262,6 +265,7 @@
   var api = {
     STORAGE_KEY: STORAGE_KEY,
     SESSION_TIMEOUT_MS: SESSION_TIMEOUT_MS,
+    STAFF_SESSION_TIMEOUT_MS: STAFF_SESSION_TIMEOUT_MS,
     REASONS: REASONS,
     STATUS: STATUS,
     emptyState: emptyState,
@@ -466,6 +470,7 @@
   }
 
   async function logoutAssignee(isAutomatic) {
+    var wasStaff = STAFF_EMPLOYEE_NUMBERS.indexOf(currentAssignee) >= 0;
     currentAssignee = '';
     role = 'general';
     if (sessionTimer) window.clearTimeout(sessionTimer);
@@ -495,16 +500,18 @@
         notify(firebaseErrorMessage(error), true);
       }
     }
-    if (isAutomatic) notify('閒置超過10分鐘，已自動登出。');
+    if (isAutomatic) notify(wasStaff ? '管理職號登入已滿8小時，已自動登出，請重新登入。' : '閒置超過10分鐘，已自動登出。');
   }
 
   function resetSessionTimer() {
     if (!currentAssignee) return;
     if (sessionTimer) window.clearTimeout(sessionTimer);
-    sessionDeadline = Date.now() + SESSION_TIMEOUT_MS;
-    if(STAFF_EMPLOYEE_NUMBERS.indexOf(currentAssignee)>=0)sessionStorage.setItem('kmu-staff-deadline',String(sessionDeadline));
-    function checkExpiry(){var shared=Number(sessionStorage.getItem('kmu-staff-deadline'));if(STAFF_EMPLOYEE_NUMBERS.indexOf(currentAssignee)>=0&&shared>Date.now()){sessionDeadline=shared;sessionTimer=window.setTimeout(checkExpiry,shared-Date.now());return;}logoutAssignee(true);}
-    sessionTimer = window.setTimeout(checkExpiry, SESSION_TIMEOUT_MS);
+    var isStaff = STAFF_EMPLOYEE_NUMBERS.indexOf(currentAssignee) >= 0;
+    // Staff: fixed 8-hour window from login (not extended by activity). Others: 10-minute idle timeout.
+    var staffDeadline = isStaff && firebaseStore && firebaseStore.staffDeadline ? firebaseStore.staffDeadline() : 0;
+    sessionDeadline = isStaff && staffDeadline ? staffDeadline : Date.now() + SESSION_TIMEOUT_MS;
+    function checkExpiry(){var shared=isStaff&&firebaseStore&&firebaseStore.staffDeadline?firebaseStore.staffDeadline():0;if(isStaff&&shared>Date.now()){sessionDeadline=shared;sessionTimer=window.setTimeout(checkExpiry,Math.min(shared-Date.now(),2147483000));return;}logoutAssignee(true);}
+    sessionTimer = window.setTimeout(checkExpiry, Math.max(0, sessionDeadline - Date.now()));
     if (!sessionInterval) {
       sessionInterval = window.setInterval(updateSessionCountdown, 1000);
     }
