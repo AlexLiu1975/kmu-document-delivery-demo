@@ -71,7 +71,8 @@ test('builds rejected, re-received, and archived transaction mutations', () => {
 test('Firebase browser adapter uses anonymous auth, snapshots, and transactions', () => {
   const source = fs.readFileSync(path.join(root, 'firebase-store.js'), 'utf8');
   assert.match(source, /initializeAuth/);
-  assert.match(source, /browserSessionPersistence/);
+  assert.match(source, /browserLocalPersistence/);
+  assert.match(source, /STAFF_SESSION_MS = 8 \* 60 \* 60 \* 1000/);
   assert.match(source, /signInAnonymously/);
   assert.match(source, /signOut/);
   assert.match(source, /onSnapshot/);

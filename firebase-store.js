@@ -1,7 +1,7 @@
 import { initializeApp } from
   'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
 import {
-  browserSessionPersistence,
+  browserLocalPersistence,
   signInWithEmailAndPassword,
   updatePassword,
   initializeAuth,
@@ -27,7 +27,19 @@ const core = window.FirebaseStoreCore;
 if (!core) throw new Error('Firebase 資料驗證模組載入失敗。');
 
 const app = initializeApp(firebaseConfig);
-const auth = initializeAuth(app, { persistence: browserSessionPersistence });
+// Staff sessions persist across tabs for a fixed working window (8 hours from login).
+const auth = initializeAuth(app, { persistence: browserLocalPersistence });
+const STAFF_SESSION_MS = 8 * 60 * 60 * 1000;
+const STAFF_DEADLINE_KEY = 'kmu-staff-deadline';
+function staffDeadline() {
+  try { return Number(localStorage.getItem(STAFF_DEADLINE_KEY)) || 0; } catch { return 0; }
+}
+function setStaffDeadline(value) {
+  try { localStorage.setItem(STAFF_DEADLINE_KEY, String(value)); } catch {}
+}
+function clearStaffDeadline() {
+  try { localStorage.removeItem(STAFF_DEADLINE_KEY); } catch {}
+}
 const database = getFirestore(app);
 let employeeNumber = '';
 let anonymousLogin = null;
@@ -104,8 +116,8 @@ function normalizeSnapshotData(data) {
 async function staffSession() {
   if(auth.authStateReady) await auth.authStateReady();
   if(!auth.currentUser || auth.currentUser.isAnonymous) return null;
-  const deadline=Number(sessionStorage.getItem('kmu-staff-deadline'));
-  if(!deadline||Date.now()>=deadline){await signOut(auth);return null;}
+  const deadline=staffDeadline();
+  if(!deadline||Date.now()>=deadline){clearStaffDeadline();await signOut(auth);return null;}
   const user=auth.currentUser;
   const row=await getDoc(doc(database,'staffAdmins',user.uid));
   if(auth.currentUser?.uid!==user.uid)return null;
@@ -119,11 +131,11 @@ async function login(value,password) {
     await ensureAnonymous();
     if(!password) throw Error('管理職號請輸入密碼。');
     try {
-      sessionStorage.setItem('kmu-staff-deadline',String(Date.now()+600000));
+      setStaffDeadline(Date.now()+STAFF_SESSION_MS);
       await signInWithEmailAndPassword(auth,actor+'@staff.kmu-document-delivery.invalid',password);
       const session=await staffSession();
       if(!session||session.employeeNumber!==actor) throw Error('管理職號不符。');
-    } catch(error) { employeeNumber='';await signOut(auth);throw Error('管理職號或密碼錯誤，或帳號尚未啟用。'); }
+    } catch(error) { employeeNumber='';clearStaffDeadline();await signOut(auth);throw Error('管理職號或密碼錯誤，或帳號尚未啟用。'); }
   } else { await ensureAnonymous();if(!auth.currentUser.isAnonymous){await signOut(auth);await ensureAnonymous();}employeeNumber=actor; }
   void recordUsage('LOGIN');
   return { uid: auth.currentUser.uid, employeeNumber };
@@ -135,7 +147,7 @@ async function changePassword(password) {
   await updatePassword(auth.currentUser,password);
 }
 async function logout() {
-  sessionStorage.removeItem('kmu-staff-deadline');
+  clearStaffDeadline();
   ipPromise = null;
   employeeNumber = '';
   if (auth.currentUser) await signOut(auth);
@@ -220,6 +232,8 @@ function subscribe(onData, onError) {
 window.firebaseDocumentStore = {
   recordUsage,
   staffSession,
+  staffDeadline,
+  STAFF_SESSION_MS,
   changePassword,
   login,
   logout,
